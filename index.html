@@ -160,7 +160,12 @@
   <!-- ============ WORKOUT ============ -->
   <section id="v-train" class="view on">
     <div class="panel">
-      <h2>今日のトレーニング <span class="tag" id="todayDate"></span></h2>
+      <h2>トレーニング記録 <span class="tag" id="todayDate"></span></h2>
+      <div class="eyebrow">記録する日付</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px">
+        <input id="trainDate" type="date" style="flex:1; padding:9px 10px; border:1px solid var(--line); border-radius:9px; font-size:16px; background:#fff; color:var(--ink); font-family:var(--num)" onchange="onDateChange()">
+        <button class="btn ghost" style="padding:9px 12px; font-size:13px; white-space:nowrap" onclick="resetToToday()">今日に戻す</button>
+      </div>
       <div class="eyebrow">セットを選択</div>
       <div class="abtoggle">
         <button id="pickA" onclick="pickSet('A')" aria-pressed="true">Aセット <span class="en">下半身</span></button>
@@ -438,14 +443,28 @@ function suggestNextSet(){ const last=S.sessions[S.sessions.length-1]; return la
 function pickSet(s){ curSet=s; renderExList(); $('#pickA').setAttribute('aria-pressed',s==='A'); $('#pickB').setAttribute('aria-pressed',s==='B'); $('#exHdr').firstChild.textContent = (s==='A'?'Aセット・下半身 ':'Bセット・上半身 '); }
 
 function renderTrain(){
-  $('#todayDate').textContent=todayISO();
+  const dp=$('#trainDate');
+  if(!dp.value) dp.value=todayISO();
+  updateDateTag();
   const last=S.sessions[S.sessions.length-1];
   $('#lastSetLabel').textContent = last? (last.set+'セット / '+last.date) : 'なし';
   const sug=suggestNextSet();
-  $('#suggestSet').textContent = ' → 今日は '+sug+'セット がおすすめ';
+  $('#suggestSet').textContent = ' → 次は '+sug+'セット がおすすめ';
   curSet=sug; pickSet(sug);
   renderRecent();
 }
+function updateDateTag(){
+  const d=$('#trainDate').value;
+  const tag=$('#todayDate');
+  if(d===todayISO()){ tag.textContent='今日'; tag.style.color=''; tag.style.borderColor=''; }
+  else { tag.textContent=d+'（過去の記録）'; tag.style.color='var(--red)'; tag.style.borderColor='var(--red)'; }
+}
+function onDateChange(){
+  const d=$('#trainDate').value;
+  if(d>todayISO()){ toast('未来の日付は選べません'); $('#trainDate').value=todayISO(); }
+  updateDateTag();
+}
+function resetToToday(){ $('#trainDate').value=todayISO(); updateDateTag(); toast('今日の日付にしました'); }
 function renderExList(){
   const box=$('#exList'); box.innerHTML='';
   const menu=S.menus[curSet]||[];
@@ -493,11 +512,16 @@ function saveSession(){
   const cm=parseFloat($('#caMin').value), cd=parseFloat($('#caDist').value), ck=parseFloat($('#caKcal').value), ch=parseFloat($('#caHr').value);
   if(cm>0||cd>0||ck>0){ ca.type=$('#caType').value; ca.min=cm||null; ca.dist=cd||null; ca.kcal=ck||null; ca.hr=ch||null; ca.note=$('#caNote').value||''; }
   if(!exercises.length && !ca.type){ toast('入力がありません'); return; }
-  S.sessions.push({date:todayISO(), set:curSet, exercises, cardio: ca.type?ca:null, ts:Date.now()});
+  const recDate=$('#trainDate').value||todayISO();
+  /* ts=登録操作の実時刻。過去日付でも記録順が保てるよう、日付＋操作時刻の両方を保持 */
+  S.sessions.push({date:recDate, set:curSet, exercises, cardio: ca.type?ca:null, ts:Date.now()});
+  /* 日付順（同日は登録時刻順）に並べ替え。バックデート記録も正しい位置に入る */
+  S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
   save();
   ['caMin','caDist','caKcal','caHr','caNote'].forEach(id=>$('#'+id).value='');
   $('#ocrMsg').innerHTML='';
-  toast('保存しました（'+curSet+'セット）');
+  const label = recDate===todayISO()? '' : '（'+recDate+'）';
+  toast('保存しました '+curSet+'セット'+label);
   renderTrain();
 }
 function renderRecent(){
@@ -792,7 +816,7 @@ function renderHome(){
   const lastBody=S.body[S.body.length-1], firstBody=S.body[0];
   const mk=(key)=> lastBody? {v:lastBody[key], d: (firstBody&&lastBody!==firstBody&&lastBody[key]!=null&&firstBody[key]!=null)? lastBody[key]-firstBody[key]:null}:null;
   const weekAgo=Date.now()-7*864e5;
-  const wcount=S.sessions.filter(se=>(se.ts||new Date(se.date).getTime())>=weekAgo).length;
+  const wcount=S.sessions.filter(se=>new Date(se.date+'T12:00:00').getTime()>=weekAgo).length;
   k.appendChild(kpi('体重', mk('w'), 'kg', false));
   k.appendChild(kpi('体脂肪率', mk('fat'), '%', false));
   k.appendChild(kpi('筋肉量', mk('mus'), 'kg', true));
