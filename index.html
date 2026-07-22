@@ -132,6 +132,27 @@
 
   .view{display:none} .view.on{display:block}
   small.hint{color:var(--ink-faint); font-size:11px}
+  .backup-banner{background:#fff7ed; border:1px solid #f0c88a; border-radius:12px; padding:12px 14px; margin:14px 0; font-size:13px; color:#8a5a20; display:flex; align-items:center; gap:10px; justify-content:space-between}
+  .backup-banner b{color:#7a4a10}
+  .backup-banner .bb-act{display:flex; gap:6px; flex-shrink:0}
+  .backup-banner button{border:none; border-radius:8px; padding:7px 11px; font-size:12px; font-weight:700; cursor:pointer}
+  .backup-banner .go{background:#e0842f; color:#fff}
+  .backup-banner .x{background:none; color:#8a5a20; padding:7px 8px}
+  .hist .row{position:relative}
+  .hist .row .edit{border:none; background:var(--blue-soft); color:var(--blue-deep); border-radius:8px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; align-self:center; flex-shrink:0}
+  .editbox{border:1px solid var(--blue); border-radius:12px; padding:12px; margin:8px 0; background:#f7faff}
+  .editbox .eh{font-weight:800; font-size:13px; color:var(--blue-deep); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center}
+  .editbox .ex-name{font-weight:700; font-size:13px; margin:8px 0 2px}
+  .editbox .erow{display:grid; grid-template-columns:22px 1fr 1fr 1fr 26px; gap:6px; align-items:center; margin:4px 0}
+  .editbox .erow .ei{font-family:var(--num); font-size:11px; color:var(--ink-faint); text-align:center}
+  .editbox .erow input{width:100%; padding:8px 4px; border:1px solid var(--line); border-radius:8px; font-family:var(--num); font-size:16px; text-align:center; background:#fff}
+  .editbox .erow .rm{border:none; background:none; color:var(--red); font-size:16px; cursor:pointer}
+  .editbox .elbl{display:grid; grid-template-columns:22px 1fr 1fr 1fr 26px; gap:6px; font-size:9px; color:var(--ink-faint)}
+  .editbox .elbl span{text-align:center}
+  .editbox .eact{display:flex; gap:8px; margin-top:12px}
+  .editbox .eact button{flex:1; border-radius:9px; padding:11px; font-size:13px; font-weight:700; cursor:pointer; border:1px solid var(--line)}
+  .editbox .eact .save{background:var(--blue); color:#fff; border-color:var(--blue)}
+  .editbox .eact .del{background:none; color:var(--red); border-color:var(--red)}
   .flag{display:inline-block; font-family:var(--num); font-size:10px; font-weight:800; border-radius:4px; padding:0 4px; margin-left:3px; vertical-align:1px}
   .flag.H{color:#fff; background:var(--red)}
   .flag.L{color:#fff; background:#2b6cb0}
@@ -254,6 +275,7 @@
 
   <!-- ============ DASHBOARD ============ -->
   <section id="v-home" class="view">
+    <div id="backupBanner" class="backup-banner" style="display:none"></div>
     <div class="panel">
       <h2>ダッシュボード <span class="tag" id="homeUpdated"></span></h2>
       <div class="kpis" id="homeKpis"></div>
@@ -311,13 +333,16 @@
 
     <div class="panel">
       <h2>バックアップ</h2>
-      <p class="sect-note">全データの書き出し／読み込みができます。端末やブラウザを変える前に必ず書き出してください。</p>
+      <p class="sect-note">端末内のデータはブラウザの都合で消えることがあります。定期的に書き出して「ファイル」アプリ等に保管してください。</p>
+      <div id="backupStatus" class="sect-note" style="margin-bottom:10px"></div>
       <div class="btnrow">
-        <button class="btn ghost" onclick="exportData()">JSON書き出し</button>
+        <button class="btn ghost" onclick="exportData()">JSONで書き出し</button>
+        <button class="btn ghost" onclick="exportCSV()">CSVで書き出し</button>
         <button class="btn ghost" onclick="document.getElementById('importFile').click()">JSON読み込み</button>
         <input id="importFile" type="file" accept="application/json" style="display:none" onchange="importData(event)">
       </div>
-      <div style="height:10px"></div>
+      <small class="hint">JSON＝アプリに戻せる完全バックアップ／CSV＝Excelで開く閲覧用</small>
+      <div style="height:12px"></div>
       <button class="btn ghost" style="width:100%;border-color:var(--red);color:var(--red)" onclick="wipeData()">全データを削除</button>
     </div>
   </section>
@@ -353,7 +378,7 @@ const GOALS=[
 ];
 
 function defaultState(){
-  return { goals:['strength','hyper','fatloss'], menus:{A:[],B:[]}, sessions:[], body:[], health:[] };
+  return { goals:['strength','hyper','fatloss'], menus:{A:[],B:[]}, sessions:[], body:[], health:[], lastBackup:0 };
 }
 let S = store.read() || defaultState();
 function save(){ store.write(S); }
@@ -405,7 +430,7 @@ function go(v, btn){
   if(btn) btn.setAttribute('aria-selected','true');
   window.scrollTo(0,0);
   if(v==='graph') renderGraphs();
-  if(v==='home') renderHome();
+  if(v==='home'){ renderHome(); renderBanner(); }
   if(v==='body') renderBodyHist();
   if(v==='set') renderSettings();
   if(v==='train') renderTrain();
@@ -497,16 +522,90 @@ function saveSession(){
   toast('保存しました '+curSet+'セット'+label);
   renderTrain();
 }
+let editId=null;
 function renderRecent(){
   const box=$('#recentSessions'); box.innerHTML='';
   const list=S.sessions.slice(-6).reverse();
   if(!list.length){ box.appendChild(el('div','empty','<div class="k">🗒</div><p>最初のトレーニングを保存すると、ここに履歴が表示されます。</p>')); return; }
   list.forEach(se=>{
+    if(editId!=null && se.ts===editId){ box.appendChild(buildEditBox(se)); return; }
     const vol=se.exercises.reduce((a,e)=>a+e.sets.reduce((x,s)=>x+s.w*s.reps,0),0);
     const summ=se.exercises.map(e=>{const b=bestSet(e.sets); return e.name.slice(0,5)+' '+(b?fmt(b.w,0)+'×'+b.reps:'');}).join(' / ');
     const ca=se.cardio?` ・ 有酸素 ${se.cardio.type}${se.cardio.min?' '+se.cardio.min+'分':''}`:'';
-    box.appendChild(el('div','row',`<div><span class="s">${se.set}</span> <span class="d">${se.date}</span><br><small class="hint">${summ}${ca}</small></div><div class="d">${fmt(vol,0)}<br><small class="hint">総重量kg</small></div>`));
+    const row=el('div','row',`<div><span class="s">${se.set}</span> <span class="d">${se.date}</span><br><small class="hint">${summ}${ca}</small></div>`);
+    const btn=el('button','edit','編集'); btn.onclick=()=>{ if(!se.ts){ se.ts=Date.now(); save(); } editId=se.ts; renderRecent(); };
+    row.appendChild(btn);
+    box.appendChild(row);
   });
+}
+function buildEditBox(se){
+  const bx=el('div','editbox');
+  let html=`<div class="eh"><span>記録の編集</span><span class="d">${se.set}セット</span></div>
+    <div class="fld" style="margin-bottom:10px"><label>日付</label><input id="ed_date" type="date" value="${se.date}" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:16px;font-family:var(--num);background:#fff"></div>`;
+  se.exercises.forEach((e,ei)=>{
+    html+=`<div class="ex-name">${e.name}</div>
+      <div class="elbl"><span></span><span>重量kg</span><span>回数</span><span>RPE</span><span></span></div>
+      <div id="ed_ex_${ei}">`;
+    e.sets.forEach((s,si)=>{
+      html+=`<div class="erow" data-si="${si}"><span class="ei">${si+1}</span>
+        <input class="ew" type="number" inputmode="decimal" value="${s.w}">
+        <input class="er" type="number" inputmode="decimal" value="${s.reps}">
+        <input class="ep" type="number" inputmode="decimal" value="${s.rpe||''}">
+        <button class="rm" title="このセットを削除">×</button></div>`;
+    });
+    html+=`</div>`;
+  });
+  if(se.cardio){
+    const c=se.cardio;
+    html+=`<div class="ex-name">有酸素（${c.type}）</div>
+      <div class="elbl" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>分</span><span>km</span><span>kcal</span><span>心拍</span></div>
+      <div class="erow" id="ed_cardio" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <input class="cm" type="number" inputmode="decimal" value="${c.min||''}">
+        <input class="cd" type="number" inputmode="decimal" value="${c.dist||''}">
+        <input class="ck" type="number" inputmode="decimal" value="${c.kcal||''}">
+        <input class="ch" type="number" inputmode="decimal" value="${c.hr||''}"></div>`;
+  }
+  html+=`<div class="eact">
+    <button class="del" onclick="deleteSession(${se.ts})">この記録を削除</button>
+    <button class="save" onclick="saveEdit(${se.ts})">変更を保存</button>
+  </div>
+  <button class="btn ghost" style="width:100%;margin-top:8px" onclick="editId=null;renderRecent()">キャンセル</button>`;
+  bx.innerHTML=html;
+  /* セット削除ボタン */
+  bx.querySelectorAll('.rm').forEach(b=>{ b.onclick=()=>{ const row=b.closest('.erow'); if(row.parentElement.querySelectorAll('.erow').length>1) row.remove(); else toast('最低1セットは必要です'); }; });
+  return bx;
+}
+function saveEdit(ts){
+  const se=S.sessions.find(x=>x.ts===ts); if(!se) return;
+  const nd=$('#ed_date').value;
+  if(nd){ if(nd>todayISO()){ toast('未来の日付は選べません'); return; } se.date=nd; }
+  se.exercises.forEach((e,ei)=>{
+    const cont=$('#ed_ex_'+ei); if(!cont) return;
+    const sets=[];
+    cont.querySelectorAll('.erow').forEach(r=>{
+      const w=parseFloat(r.querySelector('.ew').value);
+      const reps=parseFloat(r.querySelector('.er').value);
+      const rpe=parseFloat(r.querySelector('.ep').value);
+      if(w>0&&reps>0) sets.push({w,reps,rpe:rpe>0?rpe:null});
+    });
+    e.sets=sets;
+  });
+  se.exercises=se.exercises.filter(e=>e.sets.length);
+  const cc=$('#ed_cardio');
+  if(cc&&se.cardio){
+    se.cardio.min=parseFloat(cc.querySelector('.cm').value)||null;
+    se.cardio.dist=parseFloat(cc.querySelector('.cd').value)||null;
+    se.cardio.kcal=parseFloat(cc.querySelector('.ck').value)||null;
+    se.cardio.hr=parseFloat(cc.querySelector('.ch').value)||null;
+  }
+  if(!se.exercises.length && !se.cardio){ deleteSession(ts,true); return; }
+  S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
+  save(); editId=null; toast('変更を保存しました'); renderTrain();
+}
+function deleteSession(ts,silent){
+  if(!silent && !confirm('この記録を削除します。よろしいですか？')) return;
+  S.sessions=S.sessions.filter(x=>x.ts!==ts);
+  save(); editId=null; toast('記録を削除しました'); renderTrain();
 }
 
 /* ---------- BODY / HEALTH ---------- */
@@ -729,6 +828,7 @@ function kpi(lab,obj,u,upGood){
 
 /* ---------- SETTINGS ---------- */
 function renderSettings(){
+  renderBackupStatus();
   const gc=$('#goalChips'); gc.innerHTML='';
   GOALS.forEach(g=>{ const c=el('span','chip',g.label); c.setAttribute('aria-pressed', S.goals.includes(g.id));
     c.onclick=()=>{ if(S.goals.includes(g.id)) S.goals=S.goals.filter(x=>x!==g.id); else S.goals.push(g.id); save(); c.setAttribute('aria-pressed',S.goals.includes(g.id)); }; gc.appendChild(c); });
@@ -806,11 +906,61 @@ function copyReport(){ const t=$('#reportBox'); if(!t.value){genReport();} t.sel
   try{ navigator.clipboard.writeText(t.value); toast('コピーしました'); }catch(e){ document.execCommand('copy'); toast('コピーしました'); } }
 
 /* ---------- BACKUP ---------- */
+function dataCount(){ return (S.sessions?.length||0)+(S.body?.length||0)+(S.health?.length||0); }
+function daysSince(ts){ if(!ts) return null; return Math.floor((Date.now()-ts)/864e5); }
+
 function exportData(){
   const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='trainlog_'+todayISO()+'.json'; a.click();
+  S.lastBackup=Date.now(); save();
+  renderBackupStatus(); renderBanner();
   toast('書き出しました');
 }
+function csvEsc(v){ if(v==null) return ''; const s=String(v); return /[",\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; }
+function exportCSV(){
+  const rows=[];
+  rows.push(['■トレーニング']);
+  rows.push(['日付','セット','種目','セット番号','重量kg','回数','RPE','推定1RM']);
+  S.sessions.forEach(se=>se.exercises.forEach(e=>e.sets.forEach((s,i)=>{
+    rows.push([se.date,se.set,e.name,i+1,s.w,s.reps,s.rpe??'',fmt(e1RM(s.w,s.reps,s.rpe),1)]);
+  })));
+  rows.push([]);
+  rows.push(['■有酸素']);
+  rows.push(['日付','種目','時間分','距離km','消費kcal','平均心拍']);
+  S.sessions.filter(se=>se.cardio).forEach(se=>{const c=se.cardio; rows.push([se.date,c.type,c.min??'',c.dist??'',c.kcal??'',c.hr??'']);});
+  rows.push([]);
+  rows.push(['■体組成']);
+  rows.push(['測定日','体重kg','体脂肪率%','筋肉量kg','内臓脂肪','基礎代謝','BMI']);
+  S.body.forEach(b=>rows.push([b.date,b.w??'',b.fat??'',b.mus??'',b.vis??'',b.bmr??'',b.bmi??'']));
+  rows.push([]);
+  rows.push(['■健診']);
+  rows.push(['受診日',...HFIELDS.map(f=>f.lab+(f.unit?'('+f.unit+')':''))]);
+  S.health.forEach(h=>rows.push([h.date,...HFIELDS.map(f=>{const v=h[f.k]; return v==null?'':(v+(flagOf(f,v)?flagOf(f,v):''));})]));
+  const csv='\uFEFF'+rows.map(r=>r.map(csvEsc).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='trainlog_'+todayISO()+'.csv'; a.click();
+  toast('CSVを書き出しました');
+}
+function renderBackupStatus(){
+  const s=$('#backupStatus'); if(!s) return;
+  const d=daysSince(S.lastBackup);
+  if(d==null){ s.innerHTML='最終バックアップ: <b style="color:var(--red)">まだ書き出していません</b>'; }
+  else if(d===0){ s.innerHTML='最終バックアップ: <b style="color:var(--green)">今日 ✓</b>'; }
+  else { s.innerHTML='最終バックアップ: <b style="color:'+(d>=14?'var(--red)':'var(--ink)')+'">'+d+'日前</b>（'+new Date(S.lastBackup).toISOString().slice(0,10)+'）'; }
+}
+let bannerDismissed=false;
+function renderBanner(){
+  const b=$('#backupBanner'); if(!b) return;
+  const d=daysSince(S.lastBackup);
+  const need = dataCount()>0 && !bannerDismissed && (d==null || d>=14);
+  if(!need){ b.style.display='none'; return; }
+  const msg = d==null? 'まだ一度もバックアップしていません。記録の消失に備えて書き出しをおすすめします。'
+                     : '前回のバックアップから<b>'+d+'日</b>経過しています。書き出しをおすすめします。';
+  b.innerHTML='<span>💾 '+msg+'</span><span class="bb-act"><button class="go" onclick="gotoBackup()">書き出す</button><button class="x" onclick="dismissBanner()">×</button></span>';
+  b.style.display='flex';
+}
+function dismissBanner(){ bannerDismissed=true; renderBanner(); }
+function gotoBackup(){ go('set', document.querySelectorAll('nav.tabs button')[4]); setTimeout(()=>{ const p=$('#backupStatus'); if(p) p.scrollIntoView({behavior:'smooth',block:'center'}); },60); }
 function importData(ev){
   const f=ev.target.files[0]; if(!f) return;
   const r=new FileReader();
