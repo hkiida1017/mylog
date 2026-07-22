@@ -77,16 +77,6 @@
   .btn.ghost{background:none; border:1px solid var(--line); color:var(--blue-deep)}
   .btnrow{display:flex; gap:10px; flex-wrap:wrap}
 
-  /* OCR dropzone */
-  .drop{border:2px dashed var(--line); border-radius:12px; padding:18px 12px; text-align:center; color:var(--ink-soft); font-size:13px; cursor:pointer; background:#fafbfd; transition:.15s; margin-bottom:12px}
-  .drop:hover{border-color:var(--blue); background:var(--blue-soft)}
-  .drop b{color:var(--blue-deep)}
-  .drop.busy{opacity:.6; pointer-events:none}
-  .drop .spin{display:inline-block; width:16px;height:16px;border:2px solid var(--blue);border-top-color:transparent;border-radius:50%;animation:sp 1s linear infinite; vertical-align:-3px; margin-right:6px}
-  @keyframes sp{to{transform:rotate(360deg)}}
-  .ocr-ok{font-size:12px; color:var(--green); font-weight:700; margin:-6px 0 10px}
-  .ocr-ng{font-size:12px; color:var(--red); font-weight:700; margin:-6px 0 10px}
-
   .kpis{display:grid; grid-template-columns:1fr 1fr; gap:10px}
   .kpi{border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--panel)}
   .kpi .lab{font-size:11px; color:var(--ink-soft); margin-bottom:4px}
@@ -121,12 +111,15 @@
 
   textarea.report{width:100%; min-height:220px; font-family:var(--num); font-size:12px; line-height:1.55; padding:12px; border:1px solid var(--line); border-radius:12px; background:#fff; white-space:pre; overflow:auto}
 
-  .menuex{display:grid; grid-template-columns:1fr 54px 54px 54px 54px 28px; gap:6px; align-items:center; margin:6px 0}
-  .menuex input{padding:7px 5px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fff; text-align:center; font-family:var(--num)}
-  .menuex input.name{text-align:left; font-family:var(--sans)}
-  .menuex .del{border:none; background:none; color:var(--red); font-size:16px; cursor:pointer}
-  .mhdr{display:grid; grid-template-columns:1fr 54px 54px 54px 54px 28px; gap:6px; font-size:9.5px; color:var(--ink-faint); margin-top:8px}
-  .mhdr span{text-align:center}
+  /* 種目編集カード（スマホ対応: 種目名の行と数値の行を分離） */
+  .menuex{border:1px solid var(--line); border-radius:10px; padding:10px; margin:8px 0; background:#fff}
+  .mx-top{display:flex; gap:8px; align-items:center}
+  .mx-top input.name{flex:1; min-width:0; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:16px; font-family:var(--sans); background:#fff; text-align:left}
+  .mx-top .del{border:none; background:none; color:var(--red); font-size:20px; cursor:pointer; padding:4px 8px; flex-shrink:0}
+  .mx-nums{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px}
+  .mx-f label{display:block; font-size:10px; color:var(--ink-faint); text-align:center; margin-bottom:2px; white-space:nowrap}
+  .mx-f input{width:100%; padding:8px 4px; border:1px solid var(--line); border-radius:8px; font-size:16px; font-family:var(--num); text-align:center; background:#fff}
+  .menuex input:focus{outline:none; border-color:var(--blue); box-shadow:0 0 0 3px var(--blue-soft)}
 
   nav.tabs{position:fixed; bottom:0; left:0; right:0; background:rgba(255,255,255,.94); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; z-index:50; padding-bottom:env(safe-area-inset-bottom)}
   nav.tabs button{flex:1; background:none; border:none; padding:9px 2px 8px; cursor:pointer; color:var(--ink-faint); display:flex; flex-direction:column; align-items:center; gap:3px}
@@ -181,13 +174,8 @@
     </div>
 
     <div class="panel">
-      <h2>有酸素運動 <span class="tag">スクショで自動入力</span></h2>
-      <div class="drop" id="ocrDrop" onclick="document.getElementById('ocrFile').click()">
-        📷 <b>マシン画面のスクリーンショットを選択</b><br>
-        <small>時間・距離・kcal・心拍をAIが読み取って自動入力します</small>
-      </div>
-      <input id="ocrFile" type="file" accept="image/*" style="display:none" onchange="ocrCardio(event)">
-      <div id="ocrMsg"></div>
+      <h2>有酸素運動 <span class="tag">スクショを見て転記</span></h2>
+      <p class="sect-note">マシンの画面（時間・距離・kcal・心拍）を見て入力します。</p>
       <div class="grid2">
         <div class="fld"><label>種目</label>
           <select id="caType"><option>トレッドミル</option><option>バイク</option><option>クロストレーナー</option><option>ステッパー</option><option>ウォーキング</option><option>ランニング</option><option>その他</option></select></div>
@@ -212,13 +200,7 @@
   <section id="v-body" class="view">
     <div class="panel">
       <h2>体組成 <span class="tag">数ヶ月ごと</span></h2>
-      <div class="drop" id="bcDrop" onclick="document.getElementById('bcFile').click()">
-        📷 <b>体組成計の結果シートを選択</b><br>
-        <small>体重・体脂肪率・筋肉量・内臓脂肪・基礎代謝・測定日をAIが読み取ります</small>
-      </div>
-      <input id="bcFile" type="file" accept="image/*" style="display:none" onchange="ocrBody(event)">
-      <div id="bcMsg"></div>
-      <p class="sect-note">自動入力後は数値を確認して保存してください。手動入力もできます。</p>
+      <p class="sect-note">体組成計の結果シートを見て入力します。空欄はスキップされます。</p>
       <div class="fld"><label>測定日</label><input id="bcDate" type="date"></div>
       <div class="grid3">
         <div class="fld"><label>体重 kg</label><input id="bcW" type="number" inputmode="decimal" placeholder="—"></div>
@@ -234,13 +216,7 @@
 
     <div class="panel">
       <h2>健康診断 <span class="tag">半年〜1年ごと</span></h2>
-      <div class="drop" id="hDrop" onclick="document.getElementById('hFile').click()">
-        📷 <b>健診結果の写真・スクショを選択</b><br>
-        <small>血圧・血糖・HbA1c・脂質・肝機能・受診日をAIが読み取ります</small>
-      </div>
-      <input id="hFile" type="file" accept="image/*" style="display:none" onchange="ocrHealth(event)">
-      <div id="hMsg"></div>
-      <p class="sect-note">自動入力後は数値を確認して保存してください。基準値を外れた値は<span class="flag H">H</span><span class="flag L">L</span>で表示されます。</p>
+      <p class="sect-note">健診結果を見て入力します。使う項目だけでOK。基準値を外れた値は<span class="flag H">H</span><span class="flag L">L</span>で表示されます。</p>
       <div class="fld"><label>受診日</label><input id="hDate" type="date"></div>
       <div class="grid3" id="hFields"></div>
       <div class="fld"><label>メモ</label><input id="hNote" type="text" placeholder="任意"></div>
@@ -305,13 +281,11 @@
     <div class="panel">
       <h2>Aセット（下半身）</h2>
       <p class="sect-note">実際にやっている種目を登録してください。回数レンジ・目標RPE・増量幅は種目ごとに設定できます。</p>
-      <div class="mhdr"><span style="text-align:left">種目名</span><span>回数下限</span><span>回数上限</span><span>目標RPE</span><span>増量kg</span><span></span></div>
       <div id="menuA"></div>
       <button class="btn ghost" style="width:100%;margin-top:8px" onclick="addExercise('A')">＋ 種目を追加</button>
     </div>
     <div class="panel">
       <h2>Bセット（上半身）</h2>
-      <div class="mhdr"><span style="text-align:left">種目名</span><span>回数下限</span><span>回数上限</span><span>目標RPE</span><span>増量kg</span><span></span></div>
       <div id="menuB"></div>
       <button class="btn ghost" style="width:100%;margin-top:8px" onclick="addExercise('B')">＋ 種目を追加</button>
     </div>
@@ -331,7 +305,7 @@
     <div class="panel">
       <h2>スマホでの使い方</h2>
       <p class="sect-note" style="margin-bottom:0">
-        iPhoneの場合、Safariでこのファイル（またはGitHub PagesのURL）を開き、共有ボタン →「ホーム画面に追加」でアプリのように起動できます。データはこの端末のブラウザ内に保存されるため、機種変更やブラウザ変更の前には下の「JSON書き出し」でバックアップしてください。📷ボタンからはカメラ撮影・写真ライブラリのどちらも選べます。
+        iPhoneの場合、Safariでこのファイル（またはGitHub PagesのURL）を開き、共有ボタン →「ホーム画面に追加」でアプリのように起動できます。データはこの端末のブラウザ内に保存されるため、機種変更やブラウザ変更の前には下の「JSON書き出し」でバックアップしてください。
       </p>
     </div>
 
@@ -519,7 +493,6 @@ function saveSession(){
   S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
   save();
   ['caMin','caDist','caKcal','caHr','caNote'].forEach(id=>$('#'+id).value='');
-  $('#ocrMsg').innerHTML='';
   const label = recDate===todayISO()? '' : '（'+recDate+'）';
   toast('保存しました '+curSet+'セット'+label);
   renderTrain();
@@ -534,97 +507,6 @@ function renderRecent(){
     const ca=se.cardio?` ・ 有酸素 ${se.cardio.type}${se.cardio.min?' '+se.cardio.min+'分':''}`:'';
     box.appendChild(el('div','row',`<div><span class="s">${se.set}</span> <span class="d">${se.date}</span><br><small class="hint">${summ}${ca}</small></div><div class="d">${fmt(vol,0)}<br><small class="hint">総重量kg</small></div>`));
   });
-}
-
-/* ---------- SCREENSHOT OCR (Anthropic API) ---------- */
-async function ocrImage(file, prompt){
-  const base64=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=()=>rej(new Error('read')); r.readAsDataURL(file); });
-  const media = file.type||'image/jpeg';
-  const response=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      model:'claude-sonnet-4-6', max_tokens:1000,
-      messages:[{role:'user',content:[
-        {type:'image',source:{type:'base64',media_type:media,data:base64}},
-        {type:'text',text:prompt}
-      ]}]
-    })
-  });
-  if(!response.ok) throw new Error('api '+response.status);
-  const data=await response.json();
-  const text=(data.content||[]).filter(i=>i.type==='text').map(i=>i.text).join('\n');
-  return JSON.parse(text.replace(/```json|```/g,'').trim());
-}
-async function ocrFlow(ev, dropId, msgId, idleHtml, prompt, apply){
-  const f=ev.target.files[0]; ev.target.value='';
-  if(!f) return;
-  const drop=$('#'+dropId), msg=$('#'+msgId);
-  drop.classList.add('busy');
-  drop.innerHTML='<span class="spin"></span> 画像を読み取っています…';
-  msg.innerHTML='';
-  try{
-    const j=await ocrImage(f, prompt);
-    const filled=apply(j);
-    msg.innerHTML = filled? `<div class="ocr-ok">✓ ${filled}項目を自動入力しました。数値を確認して保存してください。</div>`
-                          : `<div class="ocr-ng">数値を読み取れませんでした。手動で入力してください。</div>`;
-  }catch(e){
-    msg.innerHTML='<div class="ocr-ng">読み取りに失敗しました（この機能はClaude内で開いた場合に使えます）。手動で入力してください。</div>';
-  }finally{
-    drop.classList.remove('busy');
-    drop.innerHTML=idleHtml;
-  }
-}
-function jdate(s){ /* "2026/07/12 16:17" や "2026-7-12" → ISO日付 */
-  if(!s) return null;
-  const m=String(s).match(/(\d{4})[\/\-年\.](\d{1,2})[\/\-月\.](\d{1,2})/);
-  if(!m) return null;
-  return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
-}
-function setNum(id,v){ if(v!=null&&!isNaN(v)){ $('#'+id).value=v; return 1; } return 0; }
-
-function ocrCardio(ev){
-  ocrFlow(ev,'ocrDrop','ocrMsg',
-    '📷 <b>マシン画面のスクリーンショットを選択</b><br><small>時間・距離・kcal・心拍をAIが読み取って自動入力します</small>',
-    'これは有酸素運動マシンまたはフィットネスアプリの画面です。次のJSONだけを返してください。前置きやMarkdownは不要です。読み取れない項目はnullにしてください。\n{"type":"トレッドミル|バイク|クロストレーナー|ステッパー|ウォーキング|ランニング|その他","minutes":数値,"distance_km":数値,"kcal":数値,"avg_hr":数値}\n時間が「32:15」のような表記なら分に換算（32.25）してください。',
-    j=>{
-      let n=0;
-      if(j.type){ const sel=$('#caType'); const opt=[...sel.options].find(o=>o.value===j.type); sel.value=opt?j.type:'その他'; }
-      if(j.minutes!=null){ n+=setNum('caMin', Math.round(j.minutes*10)/10); }
-      n+=setNum('caDist', j.distance_km);
-      n+=setNum('caKcal', j.kcal);
-      n+=setNum('caHr', j.avg_hr);
-      return n;
-    });
-}
-function ocrBody(ev){
-  ocrFlow(ev,'bcDrop','bcMsg',
-    '📷 <b>体組成計の結果シートを選択</b><br><small>体重・体脂肪率・筋肉量・内臓脂肪・基礎代謝・測定日をAIが読み取ります</small>',
-    'これは体組成計の測定結果シート（InBody・タニタ等）の写真です。「今回の測定値」の列の数値を読み取り、次のJSONだけを返してください。前置きやMarkdownは不要です。読み取れない項目はnullにしてください。前回値・初回値・標準値の列と混同しないでください。\n{"date":"測定日時をYYYY/MM/DD形式で","weight_kg":体重,"bodyfat_pct":体脂肪率,"muscle_kg":筋肉量,"visceral_level":内臓脂肪レベル,"bmr_kcal":基礎代謝量,"bmi":BMI}',
-    j=>{
-      let n=0;
-      const d=jdate(j.date); if(d){ $('#bcDate').value=d; n++; }
-      n+=setNum('bcW', j.weight_kg);
-      n+=setNum('bcF', j.bodyfat_pct);
-      n+=setNum('bcM', j.muscle_kg);
-      n+=setNum('bcV', j.visceral_level);
-      n+=setNum('bcBmr', j.bmr_kcal);
-      n+=setNum('bcBmi', j.bmi);
-      return n;
-    });
-}
-function ocrHealth(ev){
-  ocrFlow(ev,'hDrop','hMsg',
-    '📷 <b>健診結果の写真・スクショを選択</b><br><small>血圧・血糖・HbA1c・脂質・肝機能・受診日をAIが読み取ります</small>',
-    'これは健康診断の結果表の写真です。経年比較の表（年ごとに列が並ぶ形式）の場合は、最も新しい年（通常は右端の列）の数値だけを読み取ってください。基準値の欄と混同しないでください。数値の後の「H」「L」記号は除いて数値だけにしてください。次のJSONだけを返してください。前置きやMarkdownは不要です。読み取れない項目はnullにしてください。\n{"date":"実施年月・受診日をYYYY/MM/DD形式で","waist":腹囲cm,"sbp":収縮期血圧,"dbp":拡張期血圧,"glu":空腹時血糖,"a1c":HbA1c,"ua":尿酸,"tg":中性脂肪,"hdl":HDLコレステロール,"ldl":LDLコレステロール,"ast":AST(GOT),"alt":ALT(GPT),"ggt":γGTP,"cre":血清クレアチニン,"egfr":eGFR,"ht":ヘマトクリット,"hb":血色素(ヘモグロビン)}',
-    j=>{
-      let n=0;
-      const d=jdate(j.date); if(d){ $('#hDate').value=d; n++; }
-      HFIELDS.forEach(f=>{
-        const added=setNum('hf_'+f.k, j[f.k]);
-        if(added){ n++; const inp=$('#hf_'+f.k); inp.classList.toggle('abn', !!flagOf(f, parseFloat(inp.value))); }
-      });
-      return n;
-    });
 }
 
 /* ---------- BODY / HEALTH ---------- */
@@ -666,7 +548,6 @@ function saveBody(){
   if(rec.w==null&&rec.fat==null&&rec.mus==null){ toast('体重・体脂肪・筋肉量のいずれかを入力してください'); return; }
   S.body.push(rec); S.body.sort((a,b)=>a.date<b.date?-1:1); save();
   ['bcW','bcF','bcM','bcV','bcBmr','bcBmi','bcNote'].forEach(id=>$('#'+id).value='');
-  $('#bcMsg').innerHTML='';
   toast('体組成を保存しました'); renderBodyHist();
 }
 function saveHealth(){
@@ -677,7 +558,7 @@ function saveHealth(){
   if(!any){ toast('1項目以上入力してください'); return; }
   S.health.push(rec); S.health.sort((a,b)=>a.date<b.date?-1:1); save();
   HFIELDS.forEach(f=>{ const i=$('#hf_'+f.k); i.value=''; i.classList.remove('abn'); });
-  $('#hNote').value=''; $('#hMsg').innerHTML='';
+  $('#hNote').value='';
   toast('健診結果を保存しました'); renderBodyHist();
 }
 function num(id){ const v=parseFloat($('#'+id).value); return isNaN(v)?null:v; }
@@ -859,12 +740,17 @@ function renderMenuEditor(k){
   if(!menu.length){ box.appendChild(el('div','empty','<p style="margin:4px 0">まだ種目がありません。「＋ 種目を追加」から登録してください。</p>')); }
   menu.forEach((ex,i)=>{
     const row=el('div','menuex');
-    row.innerHTML=`<input class="name" value="${ex.name}" data-f="name" placeholder="種目名を入力">
-      <input type="number" value="${ex.min}" data-f="min">
-      <input type="number" value="${ex.max}" data-f="max">
-      <input type="number" value="${ex.rpe}" data-f="rpe" step="0.5">
-      <input type="number" value="${ex.inc}" data-f="inc" step="0.5">
-      <button class="del" title="削除">×</button>`;
+    row.innerHTML=`
+      <div class="mx-top">
+        <input class="name" value="${ex.name}" data-f="name" placeholder="種目名を入力">
+        <button class="del" title="削除">×</button>
+      </div>
+      <div class="mx-nums">
+        <div class="mx-f"><label>回数下限</label><input type="number" inputmode="decimal" value="${ex.min}" data-f="min"></div>
+        <div class="mx-f"><label>回数上限</label><input type="number" inputmode="decimal" value="${ex.max}" data-f="max"></div>
+        <div class="mx-f"><label>目標RPE</label><input type="number" inputmode="decimal" value="${ex.rpe}" data-f="rpe" step="0.5"></div>
+        <div class="mx-f"><label>増量kg</label><input type="number" inputmode="decimal" value="${ex.inc}" data-f="inc" step="0.5"></div>
+      </div>`;
     /* 入力と同時に即保存（再描画で消えないように） */
     row.querySelectorAll('input').forEach(inp=>{
       inp.addEventListener('input',()=>{
