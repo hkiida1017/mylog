@@ -42,10 +42,11 @@
   .eyebrow{font-size:11px; letter-spacing:.12em; color:var(--blue); font-weight:700; margin:2px 0 8px}
 
   /* set toggle A/B */
-  .abtoggle{display:flex; gap:8px; margin-bottom:6px}
-  .abtoggle button{flex:1; font-size:17px; font-weight:800; letter-spacing:.04em; padding:12px; border-radius:12px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink-soft); cursor:pointer; transition:.15s}
-  .abtoggle button .en{display:block; font-size:10.5px; letter-spacing:.08em; margin-top:2px; opacity:.8; font-weight:600}
+  .abtoggle{display:flex; gap:6px; margin-bottom:6px}
+  .abtoggle button{flex:1; font-size:15px; font-weight:800; letter-spacing:.02em; padding:12px 4px; border-radius:12px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink-soft); cursor:pointer; transition:.15s}
+  .abtoggle button .en{display:block; font-size:10px; letter-spacing:.04em; margin-top:2px; opacity:.8; font-weight:600}
   .abtoggle button[aria-pressed="true"]{background:var(--blue); color:#fff; border-color:var(--blue); box-shadow:0 3px 10px rgba(37,99,235,.28)}
+  .abtoggle button.restbtn[aria-pressed="true"]{background:var(--green); border-color:var(--green); box-shadow:0 3px 10px rgba(47,158,99,.28)}
   .suggest{font-size:11px; color:var(--green); font-weight:700}
 
   .exq{border:1px solid var(--line); border-radius:12px; margin:10px 0; overflow:hidden; background:var(--panel)}
@@ -184,17 +185,24 @@
       <div class="abtoggle">
         <button id="pickA" onclick="pickSet('A')" aria-pressed="true">Aセット <span class="en">下半身</span></button>
         <button id="pickB" onclick="pickSet('B')" aria-pressed="false">Bセット <span class="en">上半身</span></button>
+        <button id="pickR" onclick="pickSet('R')" aria-pressed="false" class="restbtn">休養 <span class="en">お休み</span></button>
       </div>
       <div class="sect-note">前回は <b id="lastSetLabel">—</b>。<span class="suggest" id="suggestSet"></span></div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="restPanel" style="display:none">
+      <h2>休養日として記録 <span class="tag">お休み</span></h2>
+      <p class="sect-note">トレーニングを休んだ日として記録します。休養も回復に必要な大切な要素なので、記録しておくと頻度の振り返りに役立ちます。</p>
+      <div class="fld"><label>メモ（任意）</label><input id="restNote" type="text" placeholder="例: 出張のため / 体調不良 / 完全休養"></div>
+    </div>
+
+    <div class="panel" id="exPanel">
       <h2 id="exHdr">種目 <span class="tag">重量 × 回数 × RPE</span></h2>
       <p class="sect-note">各セットの「重量・回数・RPE(1〜10)」を入力。空欄のセットは記録されません。前回の実績から次回の目安を自動で表示します。</p>
       <div id="exList"></div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="cardioPanel">
       <h2>有酸素運動 <span class="tag">スクショを見て転記</span></h2>
       <p class="sect-note">マシンの画面（時間・距離・kcal・心拍）を見て入力します。</p>
       <div class="grid2">
@@ -208,7 +216,7 @@
       </div>
     </div>
 
-    <button class="btn primary" onclick="saveSession()">今日の記録を保存</button>
+    <button class="btn primary" id="saveBtn" onclick="saveSession()">記録を保存</button>
     <div style="height:14px"></div>
 
     <div class="panel">
@@ -386,7 +394,9 @@ function save(){ store.write(S); }
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
 const el=(t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
-const todayISO=()=> new Date().toISOString().slice(0,10);
+/* 端末のローカル時刻で日付を出す（UTC基準だと日本時間の朝9時前が前日になるため） */
+const isoOf=(dt)=>{ const d=new Date(dt); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const todayISO=()=> isoOf(new Date());
 const fmt=(n,d=1)=> (n==null||isNaN(n))?'—':(Math.round(n*(10**d))/(10**d)).toString();
 function toast(m){const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1800);}
 
@@ -438,20 +448,36 @@ function go(v, btn){
 
 /* ---------- WORKOUT ---------- */
 let curSet='A';
-function suggestNextSet(){ const last=S.sessions[S.sessions.length-1]; return last? (last.set==='A'?'B':'A') : 'A'; }
-function pickSet(s){ curSet=s; renderExList(); $('#pickA').setAttribute('aria-pressed',s==='A'); $('#pickB').setAttribute('aria-pressed',s==='B'); $('#exHdr').firstChild.textContent = (s==='A'?'Aセット・下半身 ':'Bセット・上半身 '); }
+/* 休養日(R)はA/B交互の判定から除外する */
+function suggestNextSet(){
+  for(let i=S.sessions.length-1;i>=0;i--){ const s=S.sessions[i]; if(s.set==='A'||s.set==='B') return s.set==='A'?'B':'A'; }
+  return 'A';
+}
+function pickSet(s){
+  curSet=s;
+  $('#pickA').setAttribute('aria-pressed',s==='A');
+  $('#pickB').setAttribute('aria-pressed',s==='B');
+  $('#pickR').setAttribute('aria-pressed',s==='R');
+  const rest = s==='R';
+  $('#restPanel').style.display = rest?'block':'none';
+  $('#exPanel').style.display   = rest?'none':'block';
+  $('#cardioPanel').style.display = rest?'none':'block';
+  $('#saveBtn').textContent = rest? '休養日として記録する' : '記録を保存';
+  if(!rest){ renderExList(); $('#exHdr').firstChild.textContent = (s==='A'?'Aセット・下半身 ':'Bセット・上半身 '); }
+}
 
 function renderTrain(){
   const dp=$('#trainDate');
   if(!dp.value) dp.value=todayISO();
   updateDateTag();
   const last=S.sessions[S.sessions.length-1];
-  $('#lastSetLabel').textContent = last? (last.set+'セット / '+last.date) : 'なし';
+  $('#lastSetLabel').textContent = last? (setLabel(last.set)+' / '+last.date) : 'なし';
   const sug=suggestNextSet();
   $('#suggestSet').textContent = ' → 次は '+sug+'セット がおすすめ';
   curSet=sug; pickSet(sug);
   renderRecent();
 }
+function setLabel(s){ return s==='R'? '休養日' : s+'セット'; }
 function updateDateTag(){
   const d=$('#trainDate').value;
   const tag=$('#todayDate');
@@ -494,6 +520,17 @@ function setRow(i,w,r){
   return row;
 }
 function saveSession(){
+  const recDate=$('#trainDate').value||todayISO();
+  /* 休養日の記録 */
+  if(curSet==='R'){
+    const dup=S.sessions.find(s=>s.date===recDate&&s.set==='R');
+    if(dup){ toast('この日はすでに休養日として記録済みです'); return; }
+    S.sessions.push({date:recDate, set:'R', exercises:[], cardio:null, note:$('#restNote').value||'', ts:Date.now()});
+    S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
+    save(); $('#restNote').value='';
+    toast('休養日として記録しました'+(recDate===todayISO()?'':'（'+recDate+'）'));
+    renderTrain(); return;
+  }
   const menu=S.menus[curSet]||[];
   const exercises=[];
   $('#exList').querySelectorAll('.exq').forEach((card,mi)=>{
@@ -511,7 +548,6 @@ function saveSession(){
   const cm=parseFloat($('#caMin').value), cd=parseFloat($('#caDist').value), ck=parseFloat($('#caKcal').value), ch=parseFloat($('#caHr').value);
   if(cm>0||cd>0||ck>0){ ca.type=$('#caType').value; ca.min=cm||null; ca.dist=cd||null; ca.kcal=ck||null; ca.hr=ch||null; ca.note=$('#caNote').value||''; }
   if(!exercises.length && !ca.type){ toast('入力がありません'); return; }
-  const recDate=$('#trainDate').value||todayISO();
   /* ts=登録操作の実時刻。過去日付でも記録順が保てるよう、日付＋操作時刻の両方を保持 */
   S.sessions.push({date:recDate, set:curSet, exercises, cardio: ca.type?ca:null, ts:Date.now()});
   /* 日付順（同日は登録時刻順）に並べ替え。バックデート記録も正しい位置に入る */
@@ -529,6 +565,11 @@ function renderRecent(){
   if(!list.length){ box.appendChild(el('div','empty','<div class="k">🗒</div><p>最初のトレーニングを保存すると、ここに履歴が表示されます。</p>')); return; }
   list.forEach(se=>{
     if(editId!=null && se.ts===editId){ box.appendChild(buildEditBox(se)); return; }
+    if(se.set==='R'){
+      const row=el('div','row',`<div><span class="s" style="color:var(--green)">休養</span> <span class="d">${se.date}</span>${se.note?'<br><small class="hint">'+se.note+'</small>':''}</div>`);
+      const b=el('button','edit','編集'); b.onclick=()=>{ if(!se.ts){ se.ts=Date.now(); save(); } editId=se.ts; renderRecent(); };
+      row.appendChild(b); box.appendChild(row); return;
+    }
     const vol=se.exercises.reduce((a,e)=>a+e.sets.reduce((x,s)=>x+s.w*s.reps,0),0);
     const summ=se.exercises.map(e=>{const b=bestSet(e.sets); return e.name.slice(0,5)+' '+(b?fmt(b.w,0)+'×'+b.reps:'');}).join(' / ');
     const ca=se.cardio?` ・ 有酸素 ${se.cardio.type}${se.cardio.min?' '+se.cardio.min+'分':''}`:'';
@@ -540,6 +581,17 @@ function renderRecent(){
 }
 function buildEditBox(se){
   const bx=el('div','editbox');
+  if(se.set==='R'){
+    bx.innerHTML=`<div class="eh"><span>休養日の編集</span><span class="d" style="color:var(--green)">休養</span></div>
+      <div class="fld" style="margin-bottom:10px"><label>日付</label><input id="ed_date" type="date" value="${se.date}" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:16px;font-family:var(--num);background:#fff"></div>
+      <div class="fld"><label>メモ</label><input id="ed_note" type="text" value="${se.note||''}" placeholder="任意" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:16px;background:#fff"></div>
+      <div class="eact">
+        <button class="del" onclick="deleteSession(${se.ts})">この記録を削除</button>
+        <button class="save" onclick="saveEdit(${se.ts})">変更を保存</button>
+      </div>
+      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="editId=null;renderRecent()">キャンセル</button>`;
+    return bx;
+  }
   let html=`<div class="eh"><span>記録の編集</span><span class="d">${se.set}セット</span></div>
     <div class="fld" style="margin-bottom:10px"><label>日付</label><input id="ed_date" type="date" value="${se.date}" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:16px;font-family:var(--num);background:#fff"></div>`;
   se.exercises.forEach((e,ei)=>{
@@ -579,6 +631,11 @@ function saveEdit(ts){
   const se=S.sessions.find(x=>x.ts===ts); if(!se) return;
   const nd=$('#ed_date').value;
   if(nd){ if(nd>todayISO()){ toast('未来の日付は選べません'); return; } se.date=nd; }
+  if(se.set==='R'){
+    const n=$('#ed_note'); if(n) se.note=n.value||'';
+    S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
+    save(); editId=null; toast('変更を保存しました'); renderTrain(); return;
+  }
   se.exercises.forEach((e,ei)=>{
     const cont=$('#ed_ex_'+ei); if(!cont) return;
     const sets=[];
@@ -759,7 +816,7 @@ function renderGraphs(){
     ec.innerHTML=`<div class="chartcard"><div class="ct"><span>${curExChart} 推定1RM</span><b>${pts.length?fmt(pts[pts.length-1].v,0)+'kg':'—'}</b></div>${lineChart(pts)}</div>`;
   }
   const vc=$('#volCharts'); vc.innerHTML='';
-  const volPts=S.sessions.slice(-12).map(se=>({v:se.exercises.reduce((a,e)=>a+e.sets.reduce((x,s)=>x+s.w*s.reps,0),0), label:shortDate(se.date)}));
+  const volPts=S.sessions.filter(se=>se.set!=='R').slice(-12).map(se=>({v:se.exercises.reduce((a,e)=>a+e.sets.reduce((x,s)=>x+s.w*s.reps,0),0), label:shortDate(se.date)}));
   vc.appendChild(chartCard('トレーニング量(kg)', barChart(volPts,{color:'#2563eb'})));
   const caPts=S.sessions.filter(se=>se.cardio&&se.cardio.kcal).slice(-12).map(se=>({v:se.cardio.kcal,label:shortDate(se.date)}));
   vc.appendChild(chartCard('有酸素 消費kcal', barChart(caPts,{color:'#2f9e63'})));
@@ -796,11 +853,14 @@ function renderHome(){
   const lastBody=S.body[S.body.length-1], firstBody=S.body[0];
   const mk=(key)=> lastBody? {v:lastBody[key], d: (firstBody&&lastBody!==firstBody&&lastBody[key]!=null&&firstBody[key]!=null)? lastBody[key]-firstBody[key]:null}:null;
   const weekAgo=Date.now()-7*864e5;
-  const wcount=S.sessions.filter(se=>new Date(se.date+'T12:00:00').getTime()>=weekAgo).length;
+  const inWeek=se=>new Date(se.date+'T12:00:00').getTime()>=weekAgo;
+  const wcount=S.sessions.filter(se=>se.set!=='R'&&inWeek(se)).length;
+  const rcount=S.sessions.filter(se=>se.set==='R'&&inWeek(se)).length;
   k.appendChild(kpi('体重', mk('w'), 'kg', false));
   k.appendChild(kpi('体脂肪率', mk('fat'), '%', false));
   k.appendChild(kpi('筋肉量', mk('mus'), 'kg', true));
   k.appendChild(kpi('今週のトレーニング', {v:wcount, d:null}, '回', true));
+  k.appendChild(kpi('今週の休養日', {v:rcount, d:null}, '日', true));
   const lb=$('#liftBars'); lb.innerHTML='';
   const mains=[...new Set([...(S.menus.A||[]),...(S.menus.B||[])].map(e=>e.name))];
   let any=false;
@@ -879,7 +939,8 @@ function genReport(){
   L.push('目的: '+S.goals.map(id=>(GOALS.find(g=>g.id===id)||{}).label).filter(Boolean).join('・'));
   L.push('');
   L.push('■ 最近のトレーニング（新しい順）');
-  S.sessions.slice(-4).reverse().forEach(se=>{
+  S.sessions.slice(-6).reverse().forEach(se=>{
+    if(se.set==='R'){ L.push(`・${se.date} [休養日]${se.note?' '+se.note:''}`); return; }
     L.push(`・${se.date} [${se.set}セット/${se.set==='A'?'下半身':'上半身'}]`);
     se.exercises.forEach(e=>{ const b=bestSet(e.sets); const sets=e.sets.map(s=>`${fmt(s.w,1)}kg×${s.reps}@RPE${s.rpe||'-'}`).join(', ');
       L.push(`   - ${e.name}: ${sets}  (e1RM ${fmt(b?b.e1:0,0)}kg)`); });
@@ -925,6 +986,10 @@ function exportCSV(){
     rows.push([se.date,se.set,e.name,i+1,s.w,s.reps,s.rpe??'',fmt(e1RM(s.w,s.reps,s.rpe),1)]);
   })));
   rows.push([]);
+  rows.push(['■休養日']);
+  rows.push(['日付','メモ']);
+  S.sessions.filter(se=>se.set==='R').forEach(se=>rows.push([se.date,se.note||'']));
+  rows.push([]);
   rows.push(['■有酸素']);
   rows.push(['日付','種目','時間分','距離km','消費kcal','平均心拍']);
   S.sessions.filter(se=>se.cardio).forEach(se=>{const c=se.cardio; rows.push([se.date,c.type,c.min??'',c.dist??'',c.kcal??'',c.hr??'']);});
@@ -946,7 +1011,7 @@ function renderBackupStatus(){
   const d=daysSince(S.lastBackup);
   if(d==null){ s.innerHTML='最終バックアップ: <b style="color:var(--red)">まだ書き出していません</b>'; }
   else if(d===0){ s.innerHTML='最終バックアップ: <b style="color:var(--green)">今日 ✓</b>'; }
-  else { s.innerHTML='最終バックアップ: <b style="color:'+(d>=14?'var(--red)':'var(--ink)')+'">'+d+'日前</b>（'+new Date(S.lastBackup).toISOString().slice(0,10)+'）'; }
+  else { s.innerHTML='最終バックアップ: <b style="color:'+(d>=14?'var(--red)':'var(--ink)')+'">'+d+'日前</b>（'+isoOf(S.lastBackup)+'）'; }
 }
 let bannerDismissed=false;
 function renderBanner(){
