@@ -133,6 +133,14 @@
 
   .view{display:none} .view.on{display:block}
   small.hint{color:var(--ink-faint); font-size:11px}
+  .wt-row{display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:end; margin-bottom:6px}
+  .wt-row .fld{margin-bottom:0}
+  .wt-row .nowbtn{padding:9px 10px; font-size:12px; white-space:nowrap; height:38px}
+  .durbox{margin-top:10px; padding:11px 14px; background:var(--blue-soft); border-radius:10px; font-size:13px; color:var(--blue-deep); font-weight:600}
+  .durbox b{font-family:var(--num); font-size:18px}
+  .durbox .sub{display:block; font-size:11px; color:var(--ink-soft); font-weight:500; margin-top:3px}
+  .draft-note{background:#fff7ed; border:1px solid #f0c88a; border-radius:10px; padding:9px 12px; font-size:12px; color:#8a5a20; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; gap:8px}
+  .draft-note button{border:none; background:none; color:#8a5a20; font-size:12px; font-weight:700; cursor:pointer; text-decoration:underline; flex-shrink:0}
   .backup-banner{background:#fff7ed; border:1px solid #f0c88a; border-radius:12px; padding:12px 14px; margin:14px 0; font-size:13px; color:#8a5a20; display:flex; align-items:center; gap:10px; justify-content:space-between}
   .backup-banner b{color:#7a4a10}
   .backup-banner .bb-act{display:flex; gap:6px; flex-shrink:0}
@@ -188,6 +196,22 @@
         <button id="pickR" onclick="pickSet('R')" aria-pressed="false" class="restbtn">休養 <span class="en">お休み</span></button>
       </div>
       <div class="sect-note">前回は <b id="lastSetLabel">—</b>。<span class="suggest" id="suggestSet"></span></div>
+      <div style="height:6px"></div>
+      <div id="weightPanel">
+        <div class="eyebrow">体重・トレーニング時間</div>
+        <p class="sect-note" style="margin-bottom:8px">体重を記録した時刻がそのまま開始・終了時刻になります。「現在時刻」ボタンで今の時刻が入ります。</p>
+        <div class="wt-row">
+          <div class="fld"><label>開始前の体重（kg）</label><input id="wPre" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
+          <div class="fld"><label>開始時刻</label><input id="tPre" type="time" onchange="calcDuration()"></div>
+          <button class="btn ghost nowbtn" onclick="stampNow('pre')">現在時刻</button>
+        </div>
+        <div class="wt-row">
+          <div class="fld"><label>終了後の体重（kg）</label><input id="wPost" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
+          <div class="fld"><label>終了時刻</label><input id="tPost" type="time" onchange="calcDuration()"></div>
+          <button class="btn ghost nowbtn" onclick="stampNow('post')">現在時刻</button>
+        </div>
+        <div id="durBox" class="durbox">トレーニング時間: <b>—</b></div>
+      </div>
     </div>
 
     <div class="panel" id="restPanel" style="display:none">
@@ -222,6 +246,16 @@
     <div class="panel">
       <h2>最近の記録</h2>
       <div id="recentSessions" class="hist"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Claudeにレポート <span class="tag">フィードバック用</span></h2>
+      <p class="sect-note">最近のトレーニング・有酸素・体組成をまとめたテキストを作成します。コピーしてClaudeに貼り付ければ、次回メニューのアドバイスがもらえます。</p>
+      <div class="btnrow" style="margin-bottom:10px">
+        <button class="btn ghost" onclick="genReport()">レポート作成</button>
+        <button class="btn ghost" onclick="copyReport()">コピー</button>
+      </div>
+      <textarea id="reportBox" class="report" readonly placeholder="「レポート作成」を押すと、ここにテキストが表示されます。"></textarea>
     </div>
   </section>
 
@@ -323,16 +357,6 @@
     <div style="height:14px"></div>
 
     <div class="panel">
-      <h2>Claudeにレポート <span class="tag">フィードバック用</span></h2>
-      <p class="sect-note">最近のトレーニング・有酸素・体組成をまとめたテキストを作成します。コピーしてClaudeに貼り付ければ、次回メニューのアドバイスがもらえます。</p>
-      <div class="btnrow" style="margin-bottom:10px">
-        <button class="btn ghost" onclick="genReport()">レポート作成</button>
-        <button class="btn ghost" onclick="copyReport()">コピー</button>
-      </div>
-      <textarea id="reportBox" class="report" readonly placeholder="「レポート作成」を押すと、ここにテキストが表示されます。"></textarea>
-    </div>
-
-    <div class="panel">
       <h2>スマホでの使い方</h2>
       <p class="sect-note" style="margin-bottom:0">
         iPhoneの場合、Safariでこのファイル（またはGitHub PagesのURL）を開き、共有ボタン →「ホーム画面に追加」でアプリのように起動できます。データはこの端末のブラウザ内に保存されるため、機種変更やブラウザ変更の前には下の「JSON書き出し」でバックアップしてください。
@@ -350,6 +374,9 @@
         <input id="importFile" type="file" accept="application/json" style="display:none" onchange="importData(event)">
       </div>
       <small class="hint">JSON＝アプリに戻せる完全バックアップ／CSV＝Excelで開く閲覧用</small>
+      <div style="height:12px"></div>
+      <div id="snapBox" class="sect-note" style="margin:0 0 8px"></div>
+      <button class="btn ghost" style="width:100%" onclick="restoreSnapshot()">端末内バックアップから復元</button>
       <div style="height:12px"></div>
       <button class="btn ghost" style="width:100%;border-color:var(--red);color:var(--red)" onclick="wipeData()">全データを削除</button>
     </div>
@@ -389,7 +416,26 @@ function defaultState(){
   return { goals:['strength','hyper','fatloss'], menus:{A:[],B:[]}, sessions:[], body:[], health:[], lastBackup:0 };
 }
 let S = store.read() || defaultState();
-function save(){ store.write(S); }
+/* ---- 自動スナップショット（万一データが消えた場合の復旧用・端末内に保持） ---- */
+const SNAP='trainlog_snapshot';
+function writeSnapshot(){
+  try{
+    if(!S) return;
+    const n=(S.sessions?.length||0)+(S.body?.length||0)+(S.health?.length||0);
+    if(n===0) return;                       /* 空の状態で上書きしない */
+    localStorage.setItem(SNAP, JSON.stringify({at:Date.now(), count:n, data:S}));
+  }catch(e){}
+}
+function readSnapshot(){ try{ const s=localStorage.getItem(SNAP); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function save(){ store.write(S); writeSnapshot(); }
+/* 起動時: 本体が空でスナップショットがあれば自動的に復旧する */
+(function recoverIfEmpty(){
+  const cur=(S.sessions?.length||0)+(S.body?.length||0)+(S.health?.length||0);
+  const menus=(S.menus?.A?.length||0)+(S.menus?.B?.length||0);
+  if(cur>0||menus>0) return;
+  const sn=readSnapshot();
+  if(sn&&sn.data&&sn.count>0){ S=sn.data; store.write(S); setTimeout(()=>toast('保存済みデータを自動復旧しました'),600); }
+})();
 
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
@@ -460,24 +506,122 @@ function pickSet(s){
   $('#pickR').setAttribute('aria-pressed',s==='R');
   const rest = s==='R';
   $('#restPanel').style.display = rest?'block':'none';
+  $('#weightPanel').style.display = rest?'none':'block';
   $('#exPanel').style.display   = rest?'none':'block';
   $('#cardioPanel').style.display = rest?'none':'block';
   $('#saveBtn').textContent = rest? '休養日として記録する' : '記録を保存';
   if(!rest){ renderExList(); $('#exHdr').firstChild.textContent = (s==='A'?'Aセット・下半身 ':'Bセット・上半身 '); }
+  saveDraft();
 }
 
 function renderTrain(){
   const dp=$('#trainDate');
-  if(!dp.value) dp.value=todayISO();
+  const d=readDraft();
+  if(!dp.value) dp.value=(d&&d.date)?d.date:todayISO();
   updateDateTag();
   const last=S.sessions[S.sessions.length-1];
   $('#lastSetLabel').textContent = last? (setLabel(last.set)+' / '+last.date) : 'なし';
   const sug=suggestNextSet();
   $('#suggestSet').textContent = ' → 次は '+sug+'セット がおすすめ';
-  curSet=sug; pickSet(sug);
+  /* 入力途中の記録があればそのセットを維持、なければ交互提案 */
+  const useSet = (d&&hasDraftContent(d)&&d.set)? d.set : sug;
+  curSet=useSet; pickSet(useSet);
+  if(d&&hasDraftContent(d)) applyDraft(d); else calcDuration();
   renderRecent();
 }
 function setLabel(s){ return s==='R'? '休養日' : s+'セット'; }
+
+/* ---------- 時刻・トレーニング時間 ---------- */
+function nowHM(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function stampNow(which){
+  $(which==='pre'?'#tPre':'#tPost').value=nowHM();
+  calcDuration(); saveDraft();
+  toast(which==='pre'?'開始時刻を記録しました':'終了時刻を記録しました');
+}
+function durationMin(t1,t2){
+  if(!t1||!t2) return null;
+  const p=s=>{const[a,b]=s.split(':').map(Number); return a*60+b;};
+  let d=p(t2)-p(t1);
+  if(d<0) d+=24*60;      /* 日をまたぐ場合 */
+  return d;
+}
+function fmtDur(m){ if(m==null) return '—'; const h=Math.floor(m/60), mm=m%60; return h? h+'時間'+mm+'分' : mm+'分'; }
+function calcDuration(){
+  const t1=$('#tPre').value, t2=$('#tPost').value;
+  const m=durationMin(t1,t2);
+  const wp=parseFloat($('#wPre').value), wq=parseFloat($('#wPost').value);
+  let sub='';
+  if(wp>0&&wq>0){ const d=wq-wp; sub='<span class="sub">体重変化 '+(d>=0?'+':'')+fmt(d,2)+'kg（発汗などによる一時的な増減です）</span>'; }
+  $('#durBox').innerHTML='トレーニング時間: <b>'+fmtDur(m)+'</b>'+(m!=null?'':' <small class="hint">開始・終了時刻を入れると計算されます</small>')+sub;
+  saveDraft();
+}
+
+/* ---------- 入力途中の記録を保持（タブ移動しても消えない） ---------- */
+const DKEY='trainlog_draft';
+let draftTimer=null;
+function collectDraft(){
+  const d={date:$('#trainDate')?.value||'', set:curSet,
+    wPre:$('#wPre')?.value||'', tPre:$('#tPre')?.value||'',
+    wPost:$('#wPost')?.value||'', tPost:$('#tPost')?.value||'',
+    caType:$('#caType')?.value||'', caMin:$('#caMin')?.value||'', caDist:$('#caDist')?.value||'',
+    caKcal:$('#caKcal')?.value||'', caHr:$('#caHr')?.value||'', caNote:$('#caNote')?.value||'',
+    restNote:$('#restNote')?.value||'', ex:[]};
+  document.querySelectorAll('#exList .exq').forEach(card=>{
+    const sets=[];
+    card.querySelectorAll('.setrow').forEach(r=>{
+      sets.push({w:r.querySelector('.iw').value, reps:r.querySelector('.ir').value, rpe:r.querySelector('.ip').value});
+    });
+    d.ex.push(sets);
+  });
+  return d;
+}
+function hasDraftContent(d){
+  if(!d) return false;
+  if(d.wPre||d.tPre||d.wPost||d.tPost||d.caMin||d.caDist||d.caKcal||d.caHr||d.caNote||d.restNote) return true;
+  return (d.ex||[]).some(sets=>sets.some(s=>s.w||s.reps||s.rpe));
+}
+function saveDraft(){
+  clearTimeout(draftTimer);
+  draftTimer=setTimeout(()=>{
+    const d=collectDraft();
+    try{ hasDraftContent(d)? localStorage.setItem(DKEY,JSON.stringify(d)) : localStorage.removeItem(DKEY); }catch(e){}
+  },250);
+}
+function readDraft(){ try{ const s=localStorage.getItem(DKEY); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function clearDraft(){ try{ localStorage.removeItem(DKEY); }catch(e){} const n=$('#draftNote'); if(n) n.remove(); }
+function applyDraft(d){
+  if(!d) return;
+  const set=(id,v)=>{ const e=$(id); if(e&&v!=null&&v!=='') e.value=v; };
+  set('#wPre',d.wPre); set('#tPre',d.tPre); set('#wPost',d.wPost); set('#tPost',d.tPost);
+  set('#caType',d.caType); set('#caMin',d.caMin); set('#caDist',d.caDist);
+  set('#caKcal',d.caKcal); set('#caHr',d.caHr); set('#caNote',d.caNote); set('#restNote',d.restNote);
+  const cards=document.querySelectorAll('#exList .exq');
+  (d.ex||[]).forEach((sets,ci)=>{
+    const card=cards[ci]; if(!card) return;
+    const rowsBox=card.querySelector('.setrow')?.parentElement; if(!rowsBox) return;
+    while(rowsBox.querySelectorAll('.setrow').length<sets.length) rowsBox.appendChild(setRow(rowsBox.children.length,'',''));
+    const rows=card.querySelectorAll('.setrow');
+    sets.forEach((s,si)=>{ const r=rows[si]; if(!r) return;
+      if(s.w!=='') r.querySelector('.iw').value=s.w;
+      if(s.reps!=='') r.querySelector('.ir').value=s.reps;
+      if(s.rpe!=='') r.querySelector('.ip').value=s.rpe;
+    });
+  });
+  calcDuration();
+  showDraftNote();
+}
+function showDraftNote(){
+  if($('#draftNote')) return;
+  const sec=$('#v-train'); if(!sec) return;
+  const n=el('div','draft-note','📝 入力中の記録を復元しました。「記録を保存」を押すまで保持されます。');
+  n.id='draftNote';
+  const b=el('button','','入力をクリア'); b.onclick=()=>{ if(confirm('入力中の内容をすべて消去しますか？')){ clearDraft(); renderTrain(); toast('入力をクリアしました'); } };
+  n.appendChild(b);
+  sec.insertBefore(n, sec.firstChild);
+}
+/* 記録タブ内の入力はすべて自動保存 */
+document.addEventListener('input',e=>{ if(e.target.closest('#v-train')) saveDraft(); });
+document.addEventListener('change',e=>{ if(e.target.closest('#v-train')) saveDraft(); });
 function updateDateTag(){
   const d=$('#trainDate').value;
   const tag=$('#todayDate');
@@ -527,7 +671,7 @@ function saveSession(){
     if(dup){ toast('この日はすでに休養日として記録済みです'); return; }
     S.sessions.push({date:recDate, set:'R', exercises:[], cardio:null, note:$('#restNote').value||'', ts:Date.now()});
     S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
-    save(); $('#restNote').value='';
+    save(); $('#restNote').value=''; clearDraft();
     toast('休養日として記録しました'+(recDate===todayISO()?'':'（'+recDate+'）'));
     renderTrain(); return;
   }
@@ -547,13 +691,19 @@ function saveSession(){
   const ca={};
   const cm=parseFloat($('#caMin').value), cd=parseFloat($('#caDist').value), ck=parseFloat($('#caKcal').value), ch=parseFloat($('#caHr').value);
   if(cm>0||cd>0||ck>0){ ca.type=$('#caType').value; ca.min=cm||null; ca.dist=cd||null; ca.kcal=ck||null; ca.hr=ch||null; ca.note=$('#caNote').value||''; }
-  if(!exercises.length && !ca.type){ toast('入力がありません'); return; }
+  /* 体重・トレーニング時間 */
+  const wPre=parseFloat($('#wPre').value), wPost=parseFloat($('#wPost').value);
+  const tPre=$('#tPre').value||null, tPost=$('#tPost').value||null;
+  const body={ wPre: wPre>0?wPre:null, wPost: wPost>0?wPost:null, tPre, tPost, durMin: durationMin(tPre,tPost) };
+  const hasBody = body.wPre!=null||body.wPost!=null||body.tPre||body.tPost;
+  if(!exercises.length && !ca.type && !hasBody){ toast('入力がありません'); return; }
   /* ts=登録操作の実時刻。過去日付でも記録順が保てるよう、日付＋操作時刻の両方を保持 */
-  S.sessions.push({date:recDate, set:curSet, exercises, cardio: ca.type?ca:null, ts:Date.now()});
+  S.sessions.push({date:recDate, set:curSet, exercises, cardio: ca.type?ca:null, body, ts:Date.now()});
   /* 日付順（同日は登録時刻順）に並べ替え。バックデート記録も正しい位置に入る */
   S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
   save();
-  ['caMin','caDist','caKcal','caHr','caNote'].forEach(id=>$('#'+id).value='');
+  ['caMin','caDist','caKcal','caHr','caNote','wPre','wPost','tPre','tPost'].forEach(id=>$('#'+id).value='');
+  clearDraft();
   const label = recDate===todayISO()? '' : '（'+recDate+'）';
   toast('保存しました '+curSet+'セット'+label);
   renderTrain();
@@ -573,7 +723,14 @@ function renderRecent(){
     const vol=se.exercises.reduce((a,e)=>a+e.sets.reduce((x,s)=>x+s.w*s.reps,0),0);
     const summ=se.exercises.map(e=>{const b=bestSet(e.sets); return e.name.slice(0,5)+' '+(b?fmt(b.w,0)+'×'+b.reps:'');}).join(' / ');
     const ca=se.cardio?` ・ 有酸素 ${se.cardio.type}${se.cardio.min?' '+se.cardio.min+'分':''}`:'';
-    const row=el('div','row',`<div><span class="s">${se.set}</span> <span class="d">${se.date}</span><br><small class="hint">${summ}${ca}</small></div>`);
+    const bd=se.body||{};
+    let extra='';
+    if(bd.durMin!=null) extra+=`<br><small class="hint">⏱ ${fmtDur(bd.durMin)}${bd.tPre&&bd.tPost?`（${bd.tPre}〜${bd.tPost}）`:''}</small>`;
+    if(bd.wPre!=null||bd.wPost!=null){
+      const dw=(bd.wPre!=null&&bd.wPost!=null)? ` → ${(bd.wPost-bd.wPre>=0?'+':'')}${fmt(bd.wPost-bd.wPre,2)}kg`:'';
+      extra+=`<br><small class="hint">⚖ ${bd.wPre!=null?fmt(bd.wPre,1):'—'} / ${bd.wPost!=null?fmt(bd.wPost,1):'—'}kg${dw}</small>`;
+    }
+    const row=el('div','row',`<div><span class="s">${se.set}</span> <span class="d">${se.date}</span><br><small class="hint">${summ}${ca}</small>${extra}</div>`);
     const btn=el('button','edit','編集'); btn.onclick=()=>{ if(!se.ts){ se.ts=Date.now(); save(); } editId=se.ts; renderRecent(); };
     row.appendChild(btn);
     box.appendChild(row);
@@ -593,7 +750,14 @@ function buildEditBox(se){
     return bx;
   }
   let html=`<div class="eh"><span>記録の編集</span><span class="d">${se.set}セット</span></div>
-    <div class="fld" style="margin-bottom:10px"><label>日付</label><input id="ed_date" type="date" value="${se.date}" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:16px;font-family:var(--num);background:#fff"></div>`;
+    <div class="fld" style="margin-bottom:10px"><label>日付</label><input id="ed_date" type="date" value="${se.date}" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:16px;font-family:var(--num);background:#fff"></div>
+    <div class="ex-name">体重・トレーニング時間</div>
+    <div class="elbl" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>開始前kg</span><span>開始時刻</span><span>終了後kg</span><span>終了時刻</span></div>
+    <div class="erow" id="ed_body" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <input class="bwp" type="number" inputmode="decimal" value="${se.body?.wPre??''}">
+      <input class="btp" type="time" value="${se.body?.tPre??''}">
+      <input class="bwq" type="number" inputmode="decimal" value="${se.body?.wPost??''}">
+      <input class="btq" type="time" value="${se.body?.tPost??''}"></div>`;
   se.exercises.forEach((e,ei)=>{
     html+=`<div class="ex-name">${e.name}</div>
       <div class="elbl"><span></span><span>重量kg</span><span>回数</span><span>RPE</span><span></span></div>
@@ -655,7 +819,14 @@ function saveEdit(ts){
     se.cardio.kcal=parseFloat(cc.querySelector('.ck').value)||null;
     se.cardio.hr=parseFloat(cc.querySelector('.ch').value)||null;
   }
-  if(!se.exercises.length && !se.cardio){ deleteSession(ts,true); return; }
+  const bb=$('#ed_body');
+  if(bb){
+    const wp=parseFloat(bb.querySelector('.bwp').value), wq=parseFloat(bb.querySelector('.bwq').value);
+    const tp=bb.querySelector('.btp').value||null, tq=bb.querySelector('.btq').value||null;
+    se.body={ wPre: wp>0?wp:null, wPost: wq>0?wq:null, tPre:tp, tPost:tq, durMin: durationMin(tp,tq) };
+  }
+  const hb=se.body&&(se.body.wPre!=null||se.body.wPost!=null||se.body.tPre||se.body.tPost);
+  if(!se.exercises.length && !se.cardio && !hb){ deleteSession(ts,true); return; }
   S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
   save(); editId=null; toast('変更を保存しました'); renderTrain();
 }
@@ -945,6 +1116,9 @@ function genReport(){
     se.exercises.forEach(e=>{ const b=bestSet(e.sets); const sets=e.sets.map(s=>`${fmt(s.w,1)}kg×${s.reps}@RPE${s.rpe||'-'}`).join(', ');
       L.push(`   - ${e.name}: ${sets}  (e1RM ${fmt(b?b.e1:0,0)}kg)`); });
     if(se.cardio) L.push(`   - 有酸素: ${se.cardio.type} ${se.cardio.min||'-'}分 ${se.cardio.dist||'-'}km ${se.cardio.kcal||'-'}kcal HR${se.cardio.hr||'-'}`);
+    if(se.body){ const b=se.body;
+      if(b.durMin!=null) L.push(`   - トレーニング時間: ${fmtDur(b.durMin)}（${b.tPre||'-'}〜${b.tPost||'-'}）`);
+      if(b.wPre!=null||b.wPost!=null) L.push(`   - 体重: 開始前${b.wPre!=null?fmt(b.wPre,1):'-'}kg → 終了後${b.wPost!=null?fmt(b.wPost,1):'-'}kg`); }
   });
   L.push('');
   if(S.body.length){ const b=S.body[S.body.length-1], f=S.body[0];
@@ -970,6 +1144,20 @@ function copyReport(){ const t=$('#reportBox'); if(!t.value){genReport();} t.sel
 function dataCount(){ return (S.sessions?.length||0)+(S.body?.length||0)+(S.health?.length||0); }
 function daysSince(ts){ if(!ts) return null; return Math.floor((Date.now()-ts)/864e5); }
 
+function restoreSnapshot(){
+  const sn=readSnapshot();
+  if(!sn||!sn.data){ toast('端末内バックアップがありません'); return; }
+  const cur=(S.sessions?.length||0)+(S.body?.length||0)+(S.health?.length||0);
+  if(!confirm('端末内バックアップ（'+sn.count+'件・'+isoOf(sn.at)+'時点）から復元します。\n現在のデータ'+cur+'件と統合され、記録は失われません。よろしいですか？')) return;
+  const d=sn.data;
+  const byDate=(a,b)=>{ const m={}; (a||[]).forEach(x=>{if(x&&x.date)m[x.date]=x;}); (b||[]).forEach(x=>{if(x&&x.date)m[x.date]=x;}); return Object.values(m).sort((p,q)=>p.date<q.date?-1:1); };
+  S.body=byDate(d.body,S.body); S.health=byDate(d.health,S.health);
+  const seen=new Set((S.sessions||[]).map(s=>s.ts||s.date+s.set));
+  (d.sessions||[]).forEach(s=>{ const id=s.ts||s.date+s.set; if(!seen.has(id)){ S.sessions.push(s); seen.add(id); } });
+  S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
+  if((!S.menus.A.length&&!S.menus.B.length)&&d.menus) S.menus=d.menus;
+  save(); renderBackupStatus(); toast('復元しました'); renderTrain();
+}
 function exportData(){
   const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='trainlog_'+todayISO()+'.json'; a.click();
@@ -990,6 +1178,11 @@ function exportCSV(){
   rows.push(['日付','メモ']);
   S.sessions.filter(se=>se.set==='R').forEach(se=>rows.push([se.date,se.note||'']));
   rows.push([]);
+  rows.push(['■体重・トレーニング時間']);
+  rows.push(['日付','セット','開始前kg','開始時刻','終了後kg','終了時刻','トレーニング時間(分)']);
+  S.sessions.filter(se=>se.body&&(se.body.wPre!=null||se.body.wPost!=null||se.body.tPre)).forEach(se=>{const b=se.body;
+    rows.push([se.date,se.set,b.wPre??'',b.tPre??'',b.wPost??'',b.tPost??'',b.durMin??'']);});
+  rows.push([]);
   rows.push(['■有酸素']);
   rows.push(['日付','種目','時間分','距離km','消費kcal','平均心拍']);
   S.sessions.filter(se=>se.cardio).forEach(se=>{const c=se.cardio; rows.push([se.date,c.type,c.min??'',c.dist??'',c.kcal??'',c.hr??'']);});
@@ -1007,6 +1200,12 @@ function exportCSV(){
   toast('CSVを書き出しました');
 }
 function renderBackupStatus(){
+  const sb=$('#snapBox');
+  if(sb){
+    const sn=readSnapshot();
+    sb.innerHTML = sn? '端末内バックアップ: <b style="color:var(--green)">'+sn.count+'件</b>（'+isoOf(sn.at)+' 時点・保存のたびに自動更新）'
+                     : '端末内バックアップ: <b style="color:var(--ink-faint)">なし</b>';
+  }
   const s=$('#backupStatus'); if(!s) return;
   const d=daysSince(S.lastBackup);
   if(d==null){ s.innerHTML='最終バックアップ: <b style="color:var(--red)">まだ書き出していません</b>'; }
