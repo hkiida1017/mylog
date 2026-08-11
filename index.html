@@ -56,6 +56,11 @@
   .exq .rec{margin:0; padding:9px 13px; font-size:12.5px; background:#f7f9fc; border-bottom:1px solid var(--line-2); color:var(--ink)}
   .exq .rec b{color:var(--red)}
   .exq .rec.up b{color:var(--green)}
+  .exq .rec.up{background:#f1f9f4}
+  .exq .rec.warn{background:#fff7ed; border-left:3px solid #e0842f}
+  .exq .rec.warn b{color:#b5651d}
+  .exq .rec.down{background:#fdf1ef; border-left:3px solid var(--red)}
+  .exq .rec.down b{color:var(--red)}
   .setrow{display:grid; grid-template-columns:26px 1fr 1fr 1fr; gap:7px; align-items:center; padding:7px 13px}
   .setrow .idx{font-family:var(--num); font-size:12px; color:var(--ink-faint); text-align:center}
   .setrow input{width:100%; padding:9px 4px; border:1px solid var(--line); border-radius:9px; font-family:var(--num); font-size:16px; text-align:center; background:#fff; color:var(--ink)}
@@ -464,18 +469,83 @@ function lastEntryFor(name){
   }
   return null;
 }
-function recommend(cfg, last){
+/* 最終セット（疲労状態が最もよく表れる）を判定の主軸にする */
+function lastSetOf(sets){
+  for(let i=sets.length-1;i>=0;i--){ const s=sets[i]; if(s.w>0&&s.reps>0) return s; }
+  return null;
+}
+/* 直近 n 回分の該当種目の実績を新しい順に返す */
+function historyFor(name,n){
+  const out=[];
+  for(let i=S.sessions.length-1;i>=0&&out.length<n;i--){
+    const ex=S.sessions[i].exercises.find(e=>e.name===name);
+    if(!ex) continue;
+    const ls=lastSetOf(ex.sets), bs=bestSet(ex.sets);
+    if(ls&&bs) out.push({date:S.sessions[i].date, last:ls, best:bs});
+  }
+  return out;
+}
+/* デロード検知: RPE10が2回連続、または3回連続でe1RM停滞かつRPE上昇 */
+function deloadFlag(name){
+  const h=historyFor(name,3);
+  if(h.length>=2 && (h[0].last.rpe||0)>=10 && (h[1].last.rpe||0)>=10)
+    return {on:true, reason:'限界(RPE10)が2回連続'};
+  if(h.length>=3){
+    const e=h.map(x=>x.best.e1), r=h.map(x=>x.last.rpe||0);
+    const noGain = e[0]<=e[1]*1.005 && e[1]<=e[2]*1.005;
+    const rpeUp  = r[0]>r[2] && r.every(v=>v>0);
+    if(noGain&&rpeUp) return {on:true, reason:'3回連続で記録が伸びずRPEだけ上昇'};
+  }
+  return {on:false};
+}
+/*
+  次回提案ロジック（最終セット基準）
+   A. 目標回数達成 かつ RPE<=目標      → 重量アップ
+   B. RPE 10（限界）                   → 同重量・同回数を維持し、余力1〜2回を残す
+   C. RPE 9〜9.5                       → 同重量で維持（回数は増やさない）
+   D. 回数が下限未満 かつ RPE>=9.5     → 重量を約7%下げて回数を確保
+   E. それ以外                          → 同重量で回数+1回にチャレンジ
+*/
+function recommend(cfg, last, name){
   if(!last) return {cls:'', txt:`初回はフォーム重視で <b>${cfg.min}〜${cfg.max}回 @RPE${cfg.rpe}</b> を目安に。`};
-  const {w,reps,rpe}=last;
-  if(reps>=cfg.max && rpe<=cfg.rpe){
-    const nw=Math.round((w+cfg.inc)*4)/4;
-    return {cls:'up', nextW:nw, txt:`<b>重量アップ → ${fmt(nw,2)}kg × ${cfg.min}回</b>（前回 ${fmt(w,2)}kg×${reps} RPE${rpe} クリア）`};
+  const w=last.w, reps=last.reps, rpe=last.rpe==null?null:last.rpe;
+  const dl = name? deloadFlag(name) : {on:false};
+  const round=v=>Math.round(v*4)/4;
+  let res;
+
+  if(rpe!=null && rpe>=10){
+    /* B: 限界到達 → 同じ重量・回数のまま、余力を残す方向へ */
+    res={cls:'warn', nextW:w, nextReps:reps,
+      txt:`<b>同じ重量 ${fmt(w,2)}kg × ${reps}回を維持</b>。前回は限界(RPE10)まで追い込んだので、次回は<b>余力1〜2回を残す(RPE8〜9)</b>ことを目標に。`};
+  } else if(reps>=cfg.max && rpe!=null && rpe<=cfg.rpe){
+    /* A: 目標達成かつ余裕あり → 増量 */
+    const nw=round(w+cfg.inc);
+    res={cls:'up', nextW:nw, nextReps:cfg.min,
+      txt:`<b>重量アップ → ${fmt(nw,2)}kg × ${cfg.min}回</b>（前回 ${fmt(w,2)}kg×${reps} RPE${rpe} クリア）`};
+  } else if(rpe!=null && rpe>=9 && reps>=cfg.min){
+    /* C: きつめ → 回数は増やさず維持 */
+    res={cls:'', nextW:w, nextReps:reps,
+      txt:`<b>同じ重量 ${fmt(w,2)}kg × ${reps}回で維持</b>。RPE${rpe}と高めなので、余裕が出て(RPE${cfg.rpe}以下)から次に進みます。`};
+  } else if(reps<cfg.min && rpe!=null && rpe>=9.5){
+    /* D: 回数不足かつ限界近い → 減量 */
+    const nw=round(Math.max(w*0.93, w-cfg.inc));
+    res={cls:'down', nextW:nw, nextReps:cfg.min,
+      txt:`<b>重量を下げる → ${fmt(nw,2)}kg × ${cfg.min}回</b>。前回は${reps}回(RPE${rpe})で目標回数に届かなかったため、確実にこなせる重量に戻します。`};
+  } else if(reps<cfg.min){
+    res={cls:'', nextW:w, nextReps:cfg.min,
+      txt:`<b>同じ重量 ${fmt(w,2)}kg で ${cfg.min}回</b>を目標に（前回 ${reps}回${rpe?' RPE'+rpe:''}）。`};
+  } else {
+    /* E: 余裕あり → 回数を伸ばす */
+    const tgt=Math.min(cfg.max, reps+1);
+    res={cls:'', nextW:w, nextReps:tgt,
+      txt:`<b>同じ重量 ${fmt(w,2)}kg で ${tgt}回にチャレンジ</b>（前回 ${reps}回${rpe?' RPE'+rpe:''}）`};
   }
-  if(reps<cfg.min || rpe>=9.5){
-    return {cls:'', nextW:w, txt:`<b>同じ重量 ${fmt(w,2)}kg でキープ</b>。フォームの安定を優先（前回 ${reps}回 RPE${rpe}）`};
+  if(dl.on){
+    res.cls='down';
+    res.deload=true;
+    res.txt=`⚠ <b>疲労蓄積のサイン</b>（${dl.reason}）。次回は<b>重量を10%下げる</b>か、<b>1回休養を挟む</b>ことを検討してください。<br><span style="opacity:.85">通常の目安: ${res.txt}</span>`;
   }
-  const tgt=Math.min(cfg.max, reps+1);
-  return {cls:'', nextW:w, txt:`<b>同じ重量 ${fmt(w,2)}kg で ${tgt}回にチャレンジ</b>（前回 ${reps}回 RPE${rpe}）`};
+  return res;
 }
 
 /* ---------- navigation ---------- */
@@ -640,7 +710,9 @@ function renderExList(){
   if(!menu.length){ box.appendChild(el('div','empty','<div class="k">📝</div><p>まだ種目が登録されていません。<br>「設定」タブで'+curSet+'セットの種目を追加してください。</p>')); return; }
   menu.forEach((cfg,mi)=>{
     const last=lastEntryFor(cfg.name);
-    const rec=recommend(cfg, last?last.b:null);
+    const hist=historyFor(cfg.name,1);
+    const lastSet=hist.length?hist[0].last:null;   /* 最終セットを判定の主軸に */
+    const rec=recommend(cfg, lastSet, cfg.name);
     const card=el('div','exq');
     const e1txt = last? 'e1RM '+fmt(last.b.e1,0)+'kg' : '記録なし';
     card.appendChild(el('div','head',`<span class="nm">${cfg.name}</span><span class="e1">${e1txt}<br><span style="color:var(--ink-faint)">目標 ${cfg.min}–${cfg.max}回 @RPE${cfg.rpe}</span></span>`));
@@ -648,7 +720,8 @@ function renderExList(){
     card.appendChild(el('div','setlbl','<span></span><span>重量kg</span><span>回数</span><span>RPE</span>'));
     const rows=el('div',''); rows.dataset.mi=mi;
     const preW = rec.nextW!=null?fmt(rec.nextW,2):(last?fmt(last.b.w,2):'');
-    for(let i=0;i<3;i++) rows.appendChild(setRow(i, i===0?preW:'', ''));
+    const preR = rec.nextReps!=null?rec.nextReps:'';
+    for(let i=0;i<3;i++) rows.appendChild(setRow(i, i===0?preW:'', i===0?preR:''));
     card.appendChild(rows);
     const add=el('button','add','＋ セットを追加'); add.onclick=()=>{ rows.appendChild(setRow(rows.children.length,'','')); };
     card.appendChild(add);
@@ -1047,7 +1120,7 @@ function renderHome(){
   const np=$('#nextPreview'); np.innerHTML='';
   const menu=S.menus[sug]||[];
   if(!menu.length){ np.appendChild(el('div','empty','<p>設定タブで種目を登録すると、次回の目安が表示されます。</p>')); }
-  menu.forEach(cfg=>{ const last=lastEntryFor(cfg.name); const rec=recommend(cfg,last?last.b:null);
+  menu.forEach(cfg=>{ const h=historyFor(cfg.name,1); const rec=recommend(cfg, h.length?h[0].last:null, cfg.name);
     np.appendChild(el('div','row',`<div><b>${cfg.name}</b><br><small class="hint">${rec.txt.replace(/<\/?b>/g,'')}</small></div>`)); });
 }
 function kpi(lab,obj,u,upGood){
