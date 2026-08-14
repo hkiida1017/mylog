@@ -36,8 +36,8 @@
   .rule{height:3px; border-radius:2px; background:linear-gradient(90deg,var(--blue) 0%,var(--blue) 60%,var(--green) 60%,var(--green) 70%,transparent 70%); margin:10px 0 2px}
 
   .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:16px; margin:14px 0; box-shadow:0 1px 3px rgba(28,36,48,.05)}
-  .panel h2{font-size:16px; margin:0 0 4px; letter-spacing:.02em; color:var(--ink); font-weight:800; display:flex; align-items:center; gap:8px}
-  .panel h2 .tag{font-size:10.5px; color:var(--ink-soft); letter-spacing:.06em; border:1px solid var(--line); border-radius:20px; padding:2px 9px; font-weight:600}
+  .panel h2{font-size:16px; margin:0 0 4px; letter-spacing:.02em; color:var(--ink); font-weight:800; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .panel h2 .tag{font-size:10.5px; color:var(--ink-soft); letter-spacing:.06em; border:1px solid var(--line); border-radius:20px; padding:2px 9px; font-weight:600; white-space:nowrap}
   .sect-note{font-size:12px; color:var(--ink-soft); margin:0 0 12px}
   .eyebrow{font-size:11px; letter-spacing:.12em; color:var(--blue); font-weight:700; margin:2px 0 8px}
 
@@ -138,9 +138,11 @@
 
   .view{display:none} .view.on{display:block}
   small.hint{color:var(--ink-faint); font-size:11px}
-  .wt-row{display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:end; margin-bottom:6px}
-  .wt-row .fld{margin-bottom:0}
-  .wt-row .nowbtn{padding:9px 10px; font-size:12px; white-space:nowrap; height:38px}
+  .wt-card{border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin-bottom:8px; background:#fbfcfe}
+  .wt-card .wt-h{font-size:11.5px; font-weight:700; color:var(--blue-deep); margin-bottom:8px; letter-spacing:.02em}
+  .wt-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .wt-grid .fld{margin-bottom:0}
+  .wt-card .nowbtn{width:100%; margin-top:8px; padding:9px; font-size:12.5px; white-space:nowrap}
   .durbox{margin-top:10px; padding:11px 14px; background:var(--blue-soft); border-radius:10px; font-size:13px; color:var(--blue-deep); font-weight:600}
   .durbox b{font-family:var(--num); font-size:18px}
   .durbox .sub{display:block; font-size:11px; color:var(--ink-soft); font-weight:500; margin-top:3px}
@@ -191,8 +193,8 @@
       <h2>トレーニング記録 <span class="tag" id="todayDate"></span></h2>
       <div class="eyebrow">記録する日付</div>
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px">
-        <input id="trainDate" type="date" style="flex:1; padding:9px 10px; border:1px solid var(--line); border-radius:9px; font-size:16px; background:#fff; color:var(--ink); font-family:var(--num)" onchange="onDateChange()">
-        <button class="btn ghost" style="padding:9px 12px; font-size:13px; white-space:nowrap" onclick="resetToToday()">今日に戻す</button>
+        <input id="trainDate" type="date" style="flex:1; min-width:0; padding:10px; border:1px solid var(--line); border-radius:9px; font-size:16px; background:#fff; color:var(--ink); font-family:var(--num)" onchange="onDateChange()">
+        <button class="btn ghost" style="padding:10px 12px; font-size:12.5px; white-space:nowrap; flex-shrink:0" onclick="resetToToday()">今日に戻す</button>
       </div>
       <div class="eyebrow">セットを選択</div>
       <div class="abtoggle">
@@ -205,15 +207,21 @@
       <div id="weightPanel">
         <div class="eyebrow">体重・トレーニング時間</div>
         <p class="sect-note" style="margin-bottom:8px">体重を記録した時刻がそのまま開始・終了時刻になります。「現在時刻」ボタンで今の時刻が入ります。</p>
-        <div class="wt-row">
-          <div class="fld"><label>開始前の体重（kg）</label><input id="wPre" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
-          <div class="fld"><label>開始時刻</label><input id="tPre" type="time" onchange="calcDuration()"></div>
-          <button class="btn ghost nowbtn" onclick="stampNow('pre')">現在時刻</button>
+        <div class="wt-card">
+          <div class="wt-h">▶ トレーニング開始前</div>
+          <div class="wt-grid">
+            <div class="fld"><label>体重（kg）</label><input id="wPre" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
+            <div class="fld"><label>開始時刻</label><input id="tPre" type="time" onchange="calcDuration()"></div>
+          </div>
+          <button class="btn ghost nowbtn" onclick="stampNow('pre')">🕐 現在時刻を開始時刻に入れる</button>
         </div>
-        <div class="wt-row">
-          <div class="fld"><label>終了後の体重（kg）</label><input id="wPost" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
-          <div class="fld"><label>終了時刻</label><input id="tPost" type="time" onchange="calcDuration()"></div>
-          <button class="btn ghost nowbtn" onclick="stampNow('post')">現在時刻</button>
+        <div class="wt-card">
+          <div class="wt-h">■ トレーニング終了後</div>
+          <div class="wt-grid">
+            <div class="fld"><label>体重（kg）</label><input id="wPost" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
+            <div class="fld"><label>終了時刻</label><input id="tPost" type="time" onchange="calcDuration()"></div>
+          </div>
+          <button class="btn ghost nowbtn" onclick="stampNow('post')">🕐 現在時刻を終了時刻に入れる</button>
         </div>
         <div id="durBox" class="durbox">トレーニング時間: <b>—</b></div>
       </div>
