@@ -44,14 +44,15 @@
   /* set toggle A/B */
   .abtoggle{display:flex; gap:6px; margin-bottom:6px}
   .abtoggle button{flex:1; font-size:15px; font-weight:800; letter-spacing:.02em; padding:12px 4px; border-radius:12px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink-soft); cursor:pointer; transition:.15s}
-  .abtoggle button .en{display:block; font-size:10px; letter-spacing:.04em; margin-top:2px; opacity:.8; font-weight:600}
+  .abtoggle button .en{display:block; font-size:9.5px; letter-spacing:0; margin-top:2px; opacity:.8; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .abtoggle button[aria-pressed="true"]{background:var(--blue); color:#fff; border-color:var(--blue); box-shadow:0 3px 10px rgba(37,99,235,.28)}
   .abtoggle button.restbtn[aria-pressed="true"]{background:var(--green); border-color:var(--green); box-shadow:0 3px 10px rgba(47,158,99,.28)}
   .suggest{font-size:11px; color:var(--green); font-weight:700}
 
   .exq{border:1px solid var(--line); border-radius:12px; margin:10px 0; overflow:hidden; background:var(--panel)}
-  .exq .head{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:11px 13px; background:var(--blue-soft); border-bottom:1px solid var(--line)}
-  .exq .head .nm{font-weight:700; font-size:14.5px}
+  .exq .head{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 13px; background:var(--blue-soft); border-bottom:1px solid var(--line)}
+  .exq .head .e1{flex-shrink:0}
+  .exq .head .nm{font-weight:700; font-size:14.5px; min-width:0; overflow-wrap:anywhere; line-height:1.35}
   .exq .head .e1{font-family:var(--num); font-size:11.5px; color:var(--blue-deep); text-align:right; white-space:nowrap}
   .exq .rec{margin:0; padding:9px 13px; font-size:12.5px; background:#f7f9fc; border-bottom:1px solid var(--line-2); color:var(--ink)}
   .exq .rec b{color:var(--red)}
@@ -197,33 +198,26 @@
         <button class="btn ghost" style="padding:10px 12px; font-size:12.5px; white-space:nowrap; flex-shrink:0" onclick="resetToToday()">今日に戻す</button>
       </div>
       <div class="eyebrow">セットを選択</div>
-      <div class="abtoggle">
-        <button id="pickA" onclick="pickSet('A')" aria-pressed="true">Aセット <span class="en">下半身</span></button>
-        <button id="pickB" onclick="pickSet('B')" aria-pressed="false">Bセット <span class="en">上半身</span></button>
-        <button id="pickR" onclick="pickSet('R')" aria-pressed="false" class="restbtn">休養 <span class="en">お休み</span></button>
+      <div class="abtoggle" id="dayToggle">
+        <button id="pickP" onclick="pickSet('P')" aria-pressed="true">Push <span class="en">胸・肩・三頭</span></button>
+        <button id="pickU" onclick="pickSet('U')" aria-pressed="false">Pull <span class="en">背中・裏もも</span></button>
+        <button id="pickL" onclick="pickSet('L')" aria-pressed="false">Legs <span class="en">脚・腹</span></button>
+      </div>
+      <div class="abtoggle" style="margin-top:6px">
+        <button id="pickR" onclick="pickSet('R')" aria-pressed="false" class="restbtn">休養日として記録 <span class="en">お休み</span></button>
       </div>
       <div class="sect-note">前回は <b id="lastSetLabel">—</b>。<span class="suggest" id="suggestSet"></span></div>
       <div style="height:6px"></div>
       <div id="weightPanel">
-        <div class="eyebrow">体重・トレーニング時間</div>
-        <p class="sect-note" style="margin-bottom:8px">体重を記録した時刻がそのまま開始・終了時刻になります。「現在時刻」ボタンで今の時刻が入ります。</p>
+        <div class="eyebrow">▶ トレーニング開始前</div>
+        <p class="sect-note" style="margin-bottom:8px">体重を記録した時刻がそのまま開始時刻になります。終了後の記録は、有酸素運動の下にあります。</p>
         <div class="wt-card">
-          <div class="wt-h">▶ トレーニング開始前</div>
           <div class="wt-grid">
-            <div class="fld"><label>体重（kg）</label><input id="wPre" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
+            <div class="fld"><label>開始前の体重（kg）</label><input id="wPre" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
             <div class="fld"><label>開始時刻</label><input id="tPre" type="time" onchange="calcDuration()"></div>
           </div>
           <button class="btn ghost nowbtn" onclick="stampNow('pre')">🕐 現在時刻を開始時刻に入れる</button>
         </div>
-        <div class="wt-card">
-          <div class="wt-h">■ トレーニング終了後</div>
-          <div class="wt-grid">
-            <div class="fld"><label>体重（kg）</label><input id="wPost" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
-            <div class="fld"><label>終了時刻</label><input id="tPost" type="time" onchange="calcDuration()"></div>
-          </div>
-          <button class="btn ghost nowbtn" onclick="stampNow('post')">🕐 現在時刻を終了時刻に入れる</button>
-        </div>
-        <div id="durBox" class="durbox">トレーニング時間: <b>—</b></div>
       </div>
     </div>
 
@@ -251,6 +245,19 @@
         <div class="fld"><label>平均心拍数</label><input id="caHr" type="number" inputmode="decimal" placeholder="132"></div>
         <div class="fld"><label>メモ</label><input id="caNote" type="text" placeholder="任意"></div>
       </div>
+    </div>
+
+    <div class="panel" id="postPanel">
+      <h2>トレーニング終了後 <span class="tag">仕上げに記録</span></h2>
+      <p class="sect-note">お疲れさまでした。終了後の体重と時刻を記録すると、トレーニング時間が自動計算されます。</p>
+      <div class="wt-card">
+        <div class="wt-grid">
+          <div class="fld"><label>終了後の体重（kg）</label><input id="wPost" type="number" inputmode="decimal" placeholder="—" oninput="calcDuration()"></div>
+          <div class="fld"><label>終了時刻</label><input id="tPost" type="time" onchange="calcDuration()"></div>
+        </div>
+        <button class="btn ghost nowbtn" onclick="stampNow('post')">🕐 現在時刻を終了時刻に入れる</button>
+      </div>
+      <div id="durBox" class="durbox">トレーニング時間: <b>—</b></div>
     </div>
 
     <button class="btn primary" id="saveBtn" onclick="saveSession()">記録を保存</button>
@@ -356,17 +363,25 @@
     </div>
 
     <div class="panel">
-      <h2>Aセット（下半身）</h2>
+      <h2>Push（胸・肩・三頭）</h2>
       <p class="sect-note">実際にやっている種目を登録してください。回数レンジ・目標RPE・増量幅は種目ごとに設定できます。</p>
-      <div id="menuA"></div>
-      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="addExercise('A')">＋ 種目を追加</button>
+      <div id="menuP"></div>
+      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="addExercise('P')">＋ 種目を追加</button>
     </div>
     <div class="panel">
-      <h2>Bセット（上半身）</h2>
-      <div id="menuB"></div>
-      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="addExercise('B')">＋ 種目を追加</button>
+      <h2>Pull（背中・裏もも）</h2>
+      <div id="menuU"></div>
+      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="addExercise('U')">＋ 種目を追加</button>
+    </div>
+    <div class="panel">
+      <h2>Legs &amp; Core（脚・腹）</h2>
+      <div id="menuL"></div>
+      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="addExercise('L')">＋ 種目を追加</button>
     </div>
     <button class="btn primary" onclick="saveMenus()">メニューを保存</button>
+    <div style="height:10px"></div>
+    <button class="btn ghost" style="width:100%" onclick="loadPPLPreset()">推奨PPLメニューを読み込む</button>
+    <small class="hint">※ 現在の種目設定を、Push/Pull/Legsの推奨メニューで置き換えます（記録は消えません）</small>
     <div style="height:14px"></div>
 
     <div class="panel">
@@ -425,10 +440,38 @@ const GOALS=[
   {id:'health',   label:'健康維持'}
 ];
 
+/* ---- PPL分割（Push / Pull / Legs & Core）---- */
+const DAYS=[
+  {k:'P', label:'Push',  sub:'胸・肩・三頭'},
+  {k:'U', label:'Pull',  sub:'背中・裏もも'},
+  {k:'L', label:'Legs',  sub:'脚・腹'}
+];
+const DAYKEYS=DAYS.map(d=>d.k);
+function dayOf(k){ return DAYS.find(d=>d.k===k); }
+function dayName(k){ const d=dayOf(k); return d? d.label : k; }
+function dayFull(k){ const d=dayOf(k); return d? d.label+'（'+d.sub+'）' : k; }
+function emptyMenus(){ const m={}; DAYKEYS.forEach(k=>m[k]=[]); return m; }
 function defaultState(){
-  return { goals:['strength','hyper','fatloss'], menus:{A:[],B:[]}, sessions:[], body:[], health:[], lastBackup:0 };
+  return { goals:['strength','hyper','fatloss'], menus:emptyMenus(), sessions:[], body:[], health:[], lastBackup:0 };
 }
-let S = store.read() || defaultState();
+/* 旧A/Bデータの移行: A(下半身)→L, B(上半身)→P。記録は消さずキーだけ読み替える */
+function migrateToPPL(st){
+  if(!st) return st;
+  st.menus=st.menus||{};
+  const hadOld = Array.isArray(st.menus.A)||Array.isArray(st.menus.B);
+  if(hadOld && !st.pplMigrated){
+    const A=st.menus.A||[], B=st.menus.B||[];
+    const m=emptyMenus();
+    m.L=A.slice(); m.P=B.slice();
+    st.menus=m;
+    (st.sessions||[]).forEach(s=>{ if(s.set==='A') s.set='L'; else if(s.set==='B') s.set='P'; });
+    st.pplMigrated=true;
+  }
+  DAYKEYS.forEach(k=>{ if(!Array.isArray(st.menus[k])) st.menus[k]=[]; });
+  delete st.menus.A; delete st.menus.B;
+  return st;
+}
+let S = migrateToPPL(store.read()) || defaultState();
 /* ---- 自動スナップショット（万一データが消えた場合の復旧用・端末内に保持） ---- */
 const SNAP='trainlog_snapshot';
 function writeSnapshot(){
@@ -571,24 +614,27 @@ function go(v, btn){
 }
 
 /* ---------- WORKOUT ---------- */
-let curSet='A';
-/* 休養日(R)はA/B交互の判定から除外する */
+let curSet='P';
+/* 休養日(R)を飛ばして Push→Pull→Legs の順に巡回 */
 function suggestNextSet(){
-  for(let i=S.sessions.length-1;i>=0;i--){ const s=S.sessions[i]; if(s.set==='A'||s.set==='B') return s.set==='A'?'B':'A'; }
-  return 'A';
+  for(let i=S.sessions.length-1;i>=0;i--){
+    const idx=DAYKEYS.indexOf(S.sessions[i].set);
+    if(idx>=0) return DAYKEYS[(idx+1)%DAYKEYS.length];
+  }
+  return 'P';
 }
 function pickSet(s){
   curSet=s;
-  $('#pickA').setAttribute('aria-pressed',s==='A');
-  $('#pickB').setAttribute('aria-pressed',s==='B');
+  DAYKEYS.forEach(k=>{ const b=$('#pick'+k); if(b) b.setAttribute('aria-pressed', s===k); });
   $('#pickR').setAttribute('aria-pressed',s==='R');
   const rest = s==='R';
   $('#restPanel').style.display = rest?'block':'none';
   $('#weightPanel').style.display = rest?'none':'block';
   $('#exPanel').style.display   = rest?'none':'block';
   $('#cardioPanel').style.display = rest?'none':'block';
+  $('#postPanel').style.display = rest?'none':'block';
   $('#saveBtn').textContent = rest? '休養日として記録する' : '記録を保存';
-  if(!rest){ renderExList(); $('#exHdr').firstChild.textContent = (s==='A'?'Aセット・下半身 ':'Bセット・上半身 '); }
+  if(!rest){ renderExList(); $('#exHdr').firstChild.textContent = dayFull(s)+' '; }
   saveDraft();
 }
 
@@ -600,14 +646,14 @@ function renderTrain(){
   const last=S.sessions[S.sessions.length-1];
   $('#lastSetLabel').textContent = last? (setLabel(last.set)+' / '+last.date) : 'なし';
   const sug=suggestNextSet();
-  $('#suggestSet').textContent = ' → 次は '+sug+'セット がおすすめ';
+  $('#suggestSet').textContent = ' → 次は '+dayFull(sug)+' がおすすめ';
   /* 入力途中の記録があればそのセットを維持、なければ交互提案 */
   const useSet = (d&&hasDraftContent(d)&&d.set)? d.set : sug;
   curSet=useSet; pickSet(useSet);
   if(d&&hasDraftContent(d)) applyDraft(d); else calcDuration();
   renderRecent();
 }
-function setLabel(s){ return s==='R'? '休養日' : s+'セット'; }
+function setLabel(s){ return s==='R'? '休養日' : dayName(s); }
 
 /* ---------- 時刻・トレーニング時間 ---------- */
 function nowHM(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
@@ -715,7 +761,7 @@ function resetToToday(){ $('#trainDate').value=todayISO(); updateDateTag(); toas
 function renderExList(){
   const box=$('#exList'); box.innerHTML='';
   const menu=S.menus[curSet]||[];
-  if(!menu.length){ box.appendChild(el('div','empty','<div class="k">📝</div><p>まだ種目が登録されていません。<br>「設定」タブで'+curSet+'セットの種目を追加してください。</p>')); return; }
+  if(!menu.length){ box.appendChild(el('div','empty','<div class="k">📝</div><p>まだ種目が登録されていません。<br>「設定」タブで'+dayFull(curSet)+'の種目を追加するか、<br>「推奨PPLメニューを読み込む」をお試しください。</p>')); return; }
   menu.forEach((cfg,mi)=>{
     const last=lastEntryFor(cfg.name);
     const hist=historyFor(cfg.name,1);
@@ -786,7 +832,7 @@ function saveSession(){
   ['caMin','caDist','caKcal','caHr','caNote','wPre','wPost','tPre','tPost'].forEach(id=>$('#'+id).value='');
   clearDraft();
   const label = recDate===todayISO()? '' : '（'+recDate+'）';
-  toast('保存しました '+curSet+'セット'+label);
+  toast('保存しました '+dayName(curSet)+label);
   renderTrain();
 }
 let editId=null;
@@ -811,7 +857,7 @@ function renderRecent(){
       const dw=(bd.wPre!=null&&bd.wPost!=null)? ` → ${(bd.wPost-bd.wPre>=0?'+':'')}${fmt(bd.wPost-bd.wPre,2)}kg`:'';
       extra+=`<br><small class="hint">⚖ ${bd.wPre!=null?fmt(bd.wPre,1):'—'} / ${bd.wPost!=null?fmt(bd.wPost,1):'—'}kg${dw}</small>`;
     }
-    const row=el('div','row',`<div><span class="s">${se.set}</span> <span class="d">${se.date}</span><br><small class="hint">${summ}${ca}</small>${extra}</div>`);
+    const row=el('div','row',`<div><span class="s">${setLabel(se.set)}</span> <span class="d">${se.date}</span><br><small class="hint">${summ}${ca}</small>${extra}</div>`);
     const btn=el('button','edit','編集'); btn.onclick=()=>{ if(!se.ts){ se.ts=Date.now(); save(); } editId=se.ts; renderRecent(); };
     row.appendChild(btn);
     box.appendChild(row);
@@ -830,7 +876,7 @@ function buildEditBox(se){
       <button class="btn ghost" style="width:100%;margin-top:8px" onclick="editId=null;renderRecent()">キャンセル</button>`;
     return bx;
   }
-  let html=`<div class="eh"><span>記録の編集</span><span class="d">${se.set}セット</span></div>
+  let html=`<div class="eh"><span>記録の編集</span><span class="d">${setLabel(se.set)}</span></div>
     <div class="fld" style="margin-bottom:10px"><label>日付</label><input id="ed_date" type="date" value="${se.date}" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:16px;font-family:var(--num);background:#fff"></div>
     <div class="ex-name">体重・トレーニング時間</div>
     <div class="elbl" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>開始前kg</span><span>開始時刻</span><span>終了後kg</span><span>終了時刻</span></div>
@@ -1114,7 +1160,7 @@ function renderHome(){
   k.appendChild(kpi('今週のトレーニング', {v:wcount, d:null}, '回', true));
   k.appendChild(kpi('今週の休養日', {v:rcount, d:null}, '日', true));
   const lb=$('#liftBars'); lb.innerHTML='';
-  const mains=[...new Set([...(S.menus.A||[]),...(S.menus.B||[])].map(e=>e.name))];
+  const mains=[...new Set(DAYKEYS.flatMap(k=>(S.menus[k]||[])).map(e=>e.name))];
   let any=false;
   mains.forEach(nm=>{
     const seq=[]; S.sessions.forEach(se=>{const ex=se.exercises.find(e=>e.name===nm); if(ex){const b=bestSet(ex.sets); if(b)seq.push(b.e1);} });
@@ -1124,7 +1170,7 @@ function renderHome(){
       lb.appendChild(el('div','liftbar',`<span class="nm">${nm}</span><span class="track"><span class="fill" style="width:${w}%"></span></span><span class="num">${fmt(now,0)}kg <span class="delta ${pct>=0?'up':'down'}">${sign}${fmt(pct,0)}%</span></span>`)); }
   });
   if(!any) lb.appendChild(el('div','empty','<div class="k">💪</div><p>記録を重ねると、開始時からの伸びがここに表示されます。</p>'));
-  const sug=suggestNextSet(); $('#nextSet').textContent = sug+'セット（'+(sug==='A'?'下半身':'上半身')+'）';
+  const sug=suggestNextSet(); $('#nextSet').textContent = dayFull(sug);
   const np=$('#nextPreview'); np.innerHTML='';
   const menu=S.menus[sug]||[];
   if(!menu.length){ np.appendChild(el('div','empty','<p>設定タブで種目を登録すると、次回の目安が表示されます。</p>')); }
@@ -1144,7 +1190,7 @@ function renderSettings(){
   const gc=$('#goalChips'); gc.innerHTML='';
   GOALS.forEach(g=>{ const c=el('span','chip',g.label); c.setAttribute('aria-pressed', S.goals.includes(g.id));
     c.onclick=()=>{ if(S.goals.includes(g.id)) S.goals=S.goals.filter(x=>x!==g.id); else S.goals.push(g.id); save(); c.setAttribute('aria-pressed',S.goals.includes(g.id)); }; gc.appendChild(c); });
-  renderMenuEditor('A'); renderMenuEditor('B');
+  DAYKEYS.forEach(k=>renderMenuEditor(k));
 }
 function renderMenuEditor(k){
   const box=$('#menu'+k); box.innerHTML='';
@@ -1175,13 +1221,40 @@ function renderMenuEditor(k){
     box.appendChild(row);
   });
 }
+/* 指定のPPLメニュー（すべて3セット・目標8〜10回 @RPE9。ショルダープレスのみ5〜8回） */
+const PPL_PRESET={
+  P:[
+    {name:'チェストプレス',        min:8,max:10,rpe:9,inc:2.5},
+    {name:'フライ',                min:8,max:10,rpe:9,inc:2.5},
+    {name:'ショルダープレス',      min:5,max:8, rpe:9,inc:2.5},
+    {name:'ディッピング',          min:8,max:10,rpe:9,inc:2.5}
+  ],
+  U:[
+    {name:'ラットプルダウン',      min:8,max:10,rpe:9,inc:5},
+    {name:'スミスマシン・ベントオーバーローイング', min:8,max:10,rpe:9,inc:5},
+    {name:'チンニング',            min:8,max:10,rpe:9,inc:2.5},
+    {name:'バックエクステンション',min:8,max:10,rpe:9,inc:2.5}
+  ],
+  L:[
+    {name:'スミスマシン・ワイドスクワット', min:8,max:10,rpe:9,inc:5},
+    {name:'リニアレッグプレス',    min:8,max:10,rpe:9,inc:5},
+    {name:'トルソーローテーション',min:8,max:10,rpe:9,inc:2.5},
+    {name:'アブクランチ',          min:8,max:10,rpe:9,inc:2.5}
+  ]
+};
+function loadPPLPreset(){
+  if(!confirm('推奨のPPLメニュー（Push/Pull/Legs 各4種目）を読み込みます。\n現在の種目設定は置き換わりますが、これまでの記録は消えません。よろしいですか？')) return;
+  S.menus=JSON.parse(JSON.stringify(PPL_PRESET));
+  save(); DAYKEYS.forEach(k=>renderMenuEditor(k));
+  toast('推奨メニューを読み込みました');
+}
 function addExercise(k){ S.menus[k].push({name:'', min:8,max:12,rpe:8,inc:2.5}); save(); renderMenuEditor(k); }
 function saveMenus(){
-  ['A','B'].forEach(k=>{
+  DAYKEYS.forEach(k=>{
     S.menus[k]=(S.menus[k]||[]).filter(e=>e.name&&e.name.trim())
       .map(e=>({name:e.name.trim(), min:+e.min||1, max:+e.max||1, rpe:+e.rpe||8, inc:+e.inc||2.5}));
   });
-  save(); renderMenuEditor('A'); renderMenuEditor('B');
+  save(); DAYKEYS.forEach(k=>renderMenuEditor(k));
   toast('メニューを保存しました（記録タブに反映されます）');
 }
 
@@ -1193,7 +1266,7 @@ function genReport(){
   L.push('■ 最近のトレーニング（新しい順）');
   S.sessions.slice(-6).reverse().forEach(se=>{
     if(se.set==='R'){ L.push(`・${se.date} [休養日]${se.note?' '+se.note:''}`); return; }
-    L.push(`・${se.date} [${se.set}セット/${se.set==='A'?'下半身':'上半身'}]`);
+    L.push(`・${se.date} [${dayFull(se.set)}]`);
     se.exercises.forEach(e=>{ const b=bestSet(e.sets); const sets=e.sets.map(s=>`${fmt(s.w,1)}kg×${s.reps}@RPE${s.rpe||'-'}`).join(', ');
       L.push(`   - ${e.name}: ${sets}  (e1RM ${fmt(b?b.e1:0,0)}kg)`); });
     if(se.cardio) L.push(`   - 有酸素: ${se.cardio.type} ${se.cardio.min||'-'}分 ${se.cardio.dist||'-'}km ${se.cardio.kcal||'-'}kcal HR${se.cardio.hr||'-'}`);
@@ -1213,7 +1286,7 @@ function genReport(){
     if(abn.length) L.push('   基準値外: '+abn.map(f=>`${f.lab} ${fmt(h[f.k], h[f.k]>=100?0:1)}（基準${f.ref}）`).join('、')); }
   L.push('');
   L.push('■ 相談したいこと');
-  L.push('上記をふまえて、次回の'+suggestNextSet()+'セット（'+(suggestNextSet()==='A'?'下半身':'上半身')+'）の重量・回数の目安を教えてください。停滞や疲労のサインがあれば指摘してください。有酸素と体組成の傾向についてもアドバイスをお願いします。');
+  L.push('上記をふまえて、次回の'+dayFull(suggestNextSet())+'の重量・回数の目安を教えてください。停滞や疲労のサインがあれば指摘してください。有酸素と体組成の傾向についてもアドバイスをお願いします。');
   $('#reportBox').value=L.join('\n');
   toast('レポートを作成しました');
 }
@@ -1236,7 +1309,7 @@ function restoreSnapshot(){
   const seen=new Set((S.sessions||[]).map(s=>s.ts||s.date+s.set));
   (d.sessions||[]).forEach(s=>{ const id=s.ts||s.date+s.set; if(!seen.has(id)){ S.sessions.push(s); seen.add(id); } });
   S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
-  if((!S.menus.A.length&&!S.menus.B.length)&&d.menus) S.menus=d.menus;
+  if(DAYKEYS.every(k=>!(S.menus[k]||[]).length)&&d.menus) S.menus=migrateToPPL({menus:d.menus,sessions:[]}).menus;
   save(); renderBackupStatus(); toast('復元しました'); renderTrain();
 }
 function exportData(){
@@ -1250,9 +1323,9 @@ function csvEsc(v){ if(v==null) return ''; const s=String(v); return /[",\n]/.te
 function exportCSV(){
   const rows=[];
   rows.push(['■トレーニング']);
-  rows.push(['日付','セット','種目','セット番号','重量kg','回数','RPE','推定1RM']);
+  rows.push(['日付','区分','種目','セット番号','重量kg','回数','RPE','推定1RM']);
   S.sessions.forEach(se=>se.exercises.forEach(e=>e.sets.forEach((s,i)=>{
-    rows.push([se.date,se.set,e.name,i+1,s.w,s.reps,s.rpe??'',fmt(e1RM(s.w,s.reps,s.rpe),1)]);
+    rows.push([se.date,setLabel(se.set),e.name,i+1,s.w,s.reps,s.rpe??'',fmt(e1RM(s.w,s.reps,s.rpe),1)]);
   })));
   rows.push([]);
   rows.push(['■休養日']);
@@ -1260,9 +1333,9 @@ function exportCSV(){
   S.sessions.filter(se=>se.set==='R').forEach(se=>rows.push([se.date,se.note||'']));
   rows.push([]);
   rows.push(['■体重・トレーニング時間']);
-  rows.push(['日付','セット','開始前kg','開始時刻','終了後kg','終了時刻','トレーニング時間(分)']);
+  rows.push(['日付','区分','開始前kg','開始時刻','終了後kg','終了時刻','トレーニング時間(分)']);
   S.sessions.filter(se=>se.body&&(se.body.wPre!=null||se.body.wPost!=null||se.body.tPre)).forEach(se=>{const b=se.body;
-    rows.push([se.date,se.set,b.wPre??'',b.tPre??'',b.wPost??'',b.tPost??'',b.durMin??'']);});
+    rows.push([se.date,setLabel(se.set),b.wPre??'',b.tPre??'',b.wPost??'',b.tPost??'',b.durMin??'']);});
   rows.push([]);
   rows.push(['■有酸素']);
   rows.push(['日付','種目','時間分','距離km','消費kcal','平均心拍']);
@@ -1320,7 +1393,8 @@ function importData(ev){
       const seen=new Set((S.sessions||[]).map(s=>s.ts||s.date+s.set));
       (d.sessions||[]).forEach(s=>{ const id=s.ts||s.date+s.set; if(!seen.has(id)){ S.sessions.push(s); seen.add(id); } });
       S.sessions.sort((a,b)=>(a.ts||new Date(a.date).getTime())-(b.ts||new Date(b.date).getTime()));
-      if(d.menus&&((d.menus.A&&d.menus.A.length)||(d.menus.B&&d.menus.B.length))) S.menus=d.menus;
+      if(d.menus){ const mm=migrateToPPL({menus:JSON.parse(JSON.stringify(d.menus)),sessions:d.sessions||[]}).menus;
+        if(DAYKEYS.some(k=>(mm[k]||[]).length)) S.menus=mm; }
       if(d.goals&&d.goals.length) S.goals=d.goals;
       save(); toast('読み込みました（既存データと統合）');
       go('home', document.querySelectorAll('nav.tabs button')[3]);
