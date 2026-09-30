@@ -122,7 +122,10 @@
   .menuex{border:1px solid var(--line); border-radius:10px; padding:10px; margin:8px 0; background:#fff}
   .mx-top{display:flex; gap:8px; align-items:center}
   .mx-top input.name{flex:1; min-width:0; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:16px; font-family:var(--sans); background:#fff; text-align:left}
-  .mx-top .del{border:none; background:none; color:var(--red); font-size:20px; cursor:pointer; padding:4px 8px; flex-shrink:0}
+  .mx-top .del{border:none; background:none; color:var(--red); font-size:20px; cursor:pointer; padding:4px 6px; flex-shrink:0}
+  .mx-top .ordnum{flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--blue); color:#fff; font-family:var(--num); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center}
+  .mx-top .mv{flex-shrink:0; border:1px solid var(--line); background:#fff; color:var(--blue-deep); font-size:14px; cursor:pointer; border-radius:7px; padding:5px 7px; line-height:1}
+  .mx-top .mv:disabled{opacity:.28; cursor:default}
   .mx-nums{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px}
   .mx-f label{display:block; font-size:10px; color:var(--ink-faint); text-align:center; margin-bottom:2px; white-space:nowrap}
   .mx-f input{width:100%; padding:8px 4px; border:1px solid var(--line); border-radius:8px; font-size:16px; font-family:var(--num); text-align:center; background:#fff}
@@ -364,7 +367,7 @@
 
     <div class="panel">
       <h2>Push（胸・肩・三頭）</h2>
-      <p class="sect-note">実際にやっている種目を登録してください。回数レンジ・目標RPE・増量幅は種目ごとに設定できます。</p>
+      <p class="sect-note">実際にやっている種目を登録してください。回数レンジ・目標RPE・増量幅は種目ごとに設定できます。左の番号が実施順で、<b>↑↓ボタンで順番を入れ替え</b>られます。</p>
       <div id="menuP"></div>
       <button class="btn ghost" style="width:100%;margin-top:8px" onclick="addExercise('P')">＋ 種目を追加</button>
     </div>
@@ -1200,7 +1203,10 @@ function renderMenuEditor(k){
     const row=el('div','menuex');
     row.innerHTML=`
       <div class="mx-top">
+        <span class="ordnum">${i+1}</span>
         <input class="name" value="${ex.name}" data-f="name" placeholder="種目名を入力">
+        <button class="mv up" title="上へ"${i===0?' disabled':''}>↑</button>
+        <button class="mv dn" title="下へ"${i===menu.length-1?' disabled':''}>↓</button>
         <button class="del" title="削除">×</button>
       </div>
       <div class="mx-nums">
@@ -1217,31 +1223,41 @@ function renderMenuEditor(k){
         save();
       });
     });
+    row.querySelector('.up').onclick=()=>moveExercise(k,i,-1);
+    row.querySelector('.dn').onclick=()=>moveExercise(k,i,1);
     row.querySelector('.del').onclick=()=>{ S.menus[k].splice(i,1); save(); renderMenuEditor(k); };
     box.appendChild(row);
   });
 }
 /* 指定のPPLメニュー（すべて3セット・目標8〜10回 @RPE9。ショルダープレスのみ5〜8回） */
 const PPL_PRESET={
+  /* 多関節→単関節、重い/低レップ→高レップ、体幹は最後 の原則で並べた順序 */
   P:[
     {name:'チェストプレス',        min:8,max:10,rpe:9,inc:2.5},
-    {name:'フライ',                min:8,max:10,rpe:9,inc:2.5},
     {name:'ショルダープレス',      min:5,max:8, rpe:9,inc:2.5},
-    {name:'ディッピング',          min:8,max:10,rpe:9,inc:2.5}
+    {name:'ディッピング',          min:8,max:10,rpe:9,inc:2.5},
+    {name:'フライ',                min:8,max:10,rpe:9,inc:2.5}
   ],
   U:[
-    {name:'ラットプルダウン',      min:8,max:10,rpe:9,inc:5},
-    {name:'スミスマシン・ベントオーバーローイング', min:8,max:10,rpe:9,inc:5},
     {name:'チンニング',            min:8,max:10,rpe:9,inc:2.5},
+    {name:'スミスマシン・ベントオーバーローイング', min:8,max:10,rpe:9,inc:5},
+    {name:'ラットプルダウン',      min:8,max:10,rpe:9,inc:5},
     {name:'バックエクステンション',min:8,max:10,rpe:9,inc:2.5}
   ],
   L:[
     {name:'スミスマシン・ワイドスクワット', min:8,max:10,rpe:9,inc:5},
     {name:'リニアレッグプレス',    min:8,max:10,rpe:9,inc:5},
-    {name:'トルソーローテーション',min:8,max:10,rpe:9,inc:2.5},
-    {name:'アブクランチ',          min:8,max:10,rpe:9,inc:2.5}
+    {name:'アブクランチ',          min:8,max:10,rpe:9,inc:2.5},
+    {name:'トルソーローテーション',min:8,max:10,rpe:9,inc:2.5}
   ]
 };
+/* 種目の順番を入れ替える */
+function moveExercise(k,i,dir){
+  const m=S.menus[k]||[]; const j=i+dir;
+  if(j<0||j>=m.length) return;
+  const t=m[i]; m[i]=m[j]; m[j]=t;
+  save(); renderMenuEditor(k);
+}
 function loadPPLPreset(){
   if(!confirm('推奨のPPLメニュー（Push/Pull/Legs 各4種目）を読み込みます。\n現在の種目設定は置き換わりますが、これまでの記録は消えません。よろしいですか？')) return;
   S.menus=JSON.parse(JSON.stringify(PPL_PRESET));
