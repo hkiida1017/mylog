@@ -140,6 +140,27 @@
   .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 20px; border-radius:24px; font-size:13px; font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:.25s; z-index:99}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px)}
 
+  .vit-sep{height:1px; background:var(--line); margin:12px 0 10px}
+  .vit-h{font-size:11.5px; font-weight:700; color:var(--blue-deep); margin-bottom:8px}
+  .vit-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
+  .vit-grid .fld{margin-bottom:0}
+  .vit-grid label{font-size:10px; white-space:nowrap}
+  .vit-note{font-size:12px; border-radius:9px; padding:9px 11px; margin-top:9px; font-weight:600; line-height:1.5}
+  .vit-note.ok{background:#f1f9f4; color:#1e6b43}
+  .vit-note.w1{background:#fffbea; color:#8a6a10; border:1px solid #e8d48a}
+  .vit-note.w2{background:#fff7ed; color:#8a4a10; border:1px solid #f0b47a}
+  .vit-note.w3{background:#fdf1ef; color:#9c2c18; border:1px solid #efa092}
+  .modal-bg{display:none; position:fixed; inset:0; background:rgba(16,22,30,.55); z-index:200; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(2px)}
+  .modal-bg.on{display:flex}
+  .modal{background:#fff; border-radius:16px; max-width:430px; width:100%; max-height:84vh; overflow:auto; box-shadow:0 18px 50px rgba(0,0,0,.3)}
+  .modal-h{padding:16px 18px; font-size:16px; font-weight:800; color:#fff; border-radius:16px 16px 0 0}
+  .modal-h.w1{background:#c9a227} .modal-h.w2{background:#e0842f} .modal-h.w3{background:#d23b22}
+  .modal-b{padding:16px 18px; font-size:14px; line-height:1.7; color:var(--ink)}
+  .modal-b .big{font-family:var(--num); font-size:26px; font-weight:700; display:block; margin-bottom:10px; color:var(--ink)}
+  .modal-b ul{margin:10px 0 0; padding-left:20px}
+  .modal-b li{margin-bottom:5px}
+  .modal-b .ref{font-size:11.5px; color:var(--ink-soft); margin-top:12px; padding-top:10px; border-top:1px solid var(--line)}
+  .modal-f{padding:0 18px 18px}
   .view{display:none} .view.on{display:block}
   small.hint{color:var(--ink-faint); font-size:11px}
   .wt-card{border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin-bottom:8px; background:#fbfcfe}
@@ -220,6 +241,14 @@
             <div class="fld"><label>開始時刻</label><input id="tPre" type="time" onchange="calcDuration()"></div>
           </div>
           <button class="btn ghost nowbtn" onclick="stampNow('pre')">🕐 現在時刻を開始時刻に入れる</button>
+          <div class="vit-sep"></div>
+          <div class="vit-h">血圧・心拍</div>
+          <div class="vit-grid">
+            <div class="fld"><label>収縮期（上）</label><input id="vSbp" type="number" inputmode="decimal" placeholder="—" onblur="checkVitals()"></div>
+            <div class="fld"><label>拡張期（下）</label><input id="vDbp" type="number" inputmode="decimal" placeholder="—" onblur="checkVitals()"></div>
+            <div class="fld"><label>心拍数（bpm）</label><input id="vHr" type="number" inputmode="decimal" placeholder="—" onblur="checkVitals()"></div>
+          </div>
+          <div id="vitMsg"></div>
         </div>
       </div>
     </div>
@@ -328,6 +357,12 @@
       <div class="chartgrid" id="volCharts"></div>
     </div>
     <div class="panel">
+      <h2>血圧・心拍のモニタリング <span class="tag">トレーニング開始前</span></h2>
+      <p class="sect-note">緑の帯が目安の範囲です。赤い点は注意が必要だった測定値を示します。運動前は数値が高めに出やすい点にご留意ください。</p>
+      <div id="vitSummary"></div>
+      <div class="chartgrid" id="vitCharts"></div>
+    </div>
+    <div class="panel">
       <h2>体組成の推移 <span class="tag">数ヶ月スパン</span></h2>
       <div class="chartgrid" id="bodyCharts"></div>
     </div>
@@ -424,6 +459,16 @@
 </nav>
 
 <div id="toast" class="toast"></div>
+
+<div id="vitModal" class="modal-bg" onclick="if(event.target===this)closeVitModal()">
+  <div class="modal">
+    <div id="vitModalHead" class="modal-h"></div>
+    <div id="vitModalBody" class="modal-b"></div>
+    <div class="modal-f">
+      <button class="btn primary" onclick="closeVitModal()">確認しました</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ============================================================
@@ -683,6 +728,74 @@ function calcDuration(){
   saveDraft();
 }
 
+/* ---------- 血圧・心拍のチェック ----------
+   判定基準:
+   - ACSM: 安静時 SBP>=200 または DBP>=110 → 運動は見合わせ医師の確認を得る
+   - 高血圧緊急症: SBP>180 かつ/または DBP>120 → 速やかに医療機関
+   - 180-199/100-109: 症状がなくても医師への相談を検討、無理をしない
+   - AHA/ACC: 正常 <120/80、ステージ1 130-139/80-89、ステージ2 >=140/>=90
+   - 安静時心拍 >=120 → 再測定し、続けるなら慎重に
+   ※ 診断ではなく、記録の目安として注意を促すもの                        */
+const VIT_LIMITS={ sbpHi:135, dbpHi:85, hrLo:50, hrHi:100 };
+function vitalAssess(sbp,dbp,hr){
+  let lv=0; const msgs=[]; let act='';
+  if(sbp!=null||dbp!=null){
+    const s=sbp??0, d=dbp??0;
+    if(s>=180||d>=120){ lv=3; msgs.push('血圧が非常に高い値です。');
+      act='<b>今日のトレーニングは中止してください。</b>安静にして時間をおいて再測定し、それでも高い場合や頭痛・めまい・胸の痛みなどがある場合は、速やかに医療機関を受診してください。'; }
+    else if(s>=160||d>=110){ lv=Math.max(lv,3); msgs.push('血圧がかなり高い値です。');
+      act='<b>今日は運動を見合わせることをおすすめします。</b>少し休んで再測定し、高い状態が続くようなら医師にご相談ください。'; }
+    else if(s>=140||d>=90){ lv=Math.max(lv,2); msgs.push('血圧が高めです（高血圧の範囲）。');
+      act='いきむ動作（息を止める力み）を避け、重量を少し抑えて様子を見てください。この値が続くようなら医師にご相談ください。'; }
+    else if(s>=VIT_LIMITS.sbpHi||d>=VIT_LIMITS.dbpHi){ lv=Math.max(lv,1); msgs.push('血圧がやや高めです。');
+      act='運動前は数値が上がりやすいので、まずは記録を続けて傾向を見ましょう。'; }
+    else if(sbp!=null&&sbp<90){ lv=Math.max(lv,2); msgs.push('血圧が低めです。');
+      act='立ちくらみやふらつきに注意し、水分を摂って無理のない範囲で行ってください。'; }
+  }
+  if(hr!=null){
+    if(hr>=120){ lv=Math.max(lv,3); msgs.push('安静時の心拍数がかなり高い値です。');
+      act=(act?act+'<br>':'')+'<b>数分安静にして再測定してください。</b>高いままなら今日は運動を見合わせ、動悸や息苦しさがあれば医療機関にご相談ください。'; }
+    else if(hr>=VIT_LIMITS.hrHi){ lv=Math.max(lv,1); msgs.push('安静時の心拍数が高めです。');
+      act=(act?act+'<br>':'')+'カフェイン・睡眠不足・疲労・発熱などでも上がります。少し休んでから始めてください。'; }
+    else if(hr<45){ lv=Math.max(lv,1); msgs.push('安静時の心拍数が低めです。');
+      act=(act?act+'<br>':'')+'日頃から運動している方では自然なこともあります。めまいや強い倦怠感がある場合は医師にご相談ください。'; }
+  }
+  return {lv, msg:msgs.join(''), act};
+}
+function fmtVit(sbp,dbp,hr){
+  const a=[]; if(sbp!=null||dbp!=null) a.push(`${sbp??'—'}/${dbp??'—'} mmHg`);
+  if(hr!=null) a.push(`${hr} bpm`); return a.join('　');
+}
+let vitLastKey='';
+function checkVitals(opts){
+  const g=id=>{ const v=parseFloat($(id).value); return isNaN(v)?null:v; };
+  const sbp=g('#vSbp'), dbp=g('#vDbp'), hr=g('#vHr');
+  const box=$('#vitMsg'); if(!box) return;
+  if(sbp==null&&dbp==null&&hr==null){ box.innerHTML=''; vitLastKey=''; return; }
+  /* 血圧は上下そろってから判定する */
+  const bpReady = (sbp!=null&&dbp!=null)||(sbp==null&&dbp==null);
+  if(!bpReady){ box.innerHTML='<div class="vit-note w1">血圧は「上」と「下」の両方を入力してください。</div>'; return; }
+  const r=vitalAssess(sbp,dbp,hr);
+  const cls=['ok','w1','w2','w3'][r.lv];
+  box.innerHTML=`<div class="vit-note ${cls}">${fmtVit(sbp,dbp,hr)}${r.lv===0?'　— 目立った問題はありません':'　— '+r.msg}</div>`;
+  /* 同じ値で何度もポップアップを出さない */
+  const key=[sbp,dbp,hr].join('/');
+  if(r.lv>=2 && key!==vitLastKey && !(opts&&opts.silent)){ vitLastKey=key; showVitModal(r,sbp,dbp,hr); }
+  if(r.lv<2) vitLastKey=key;
+  saveDraft();
+}
+function showVitModal(r,sbp,dbp,hr){
+  const titles={2:'⚠ 数値にご注意ください',3:'🚨 今日は無理をしないでください'};
+  const h=$('#vitModalHead'), b=$('#vitModalBody');
+  h.className='modal-h w'+r.lv; h.textContent=titles[r.lv]||'ご確認ください';
+  b.innerHTML=`<span class="big">${fmtVit(sbp,dbp,hr)}</span>${r.msg}<br>${r.act}
+    <div class="ref">測定の目安: 正常な血圧は120/80mmHg未満、140/90mmHg以上が高血圧の範囲です。安静時心拍はおおむね60〜100bpmです。<br>
+    運動前は緊張や移動の直後で高めに出ることがあります。数分座って落ち着いてから測り直すと正確です。<br>
+    これは診断ではありません。気になる数値が続く場合や体調に不安がある場合は、医師にご相談ください。</div>`;
+  $('#vitModal').classList.add('on');
+}
+function closeVitModal(){ $('#vitModal').classList.remove('on'); }
+
 /* ---------- 入力途中の記録を保持（タブ移動しても消えない） ---------- */
 const DKEY='trainlog_draft';
 let draftTimer=null;
@@ -690,6 +803,7 @@ function collectDraft(){
   const d={date:$('#trainDate')?.value||'', set:curSet,
     wPre:$('#wPre')?.value||'', tPre:$('#tPre')?.value||'',
     wPost:$('#wPost')?.value||'', tPost:$('#tPost')?.value||'',
+    vSbp:$('#vSbp')?.value||'', vDbp:$('#vDbp')?.value||'', vHr:$('#vHr')?.value||'',
     caType:$('#caType')?.value||'', caMin:$('#caMin')?.value||'', caDist:$('#caDist')?.value||'',
     caKcal:$('#caKcal')?.value||'', caHr:$('#caHr')?.value||'', caNote:$('#caNote')?.value||'',
     restNote:$('#restNote')?.value||'', ex:[]};
@@ -704,7 +818,7 @@ function collectDraft(){
 }
 function hasDraftContent(d){
   if(!d) return false;
-  if(d.wPre||d.tPre||d.wPost||d.tPost||d.caMin||d.caDist||d.caKcal||d.caHr||d.caNote||d.restNote) return true;
+  if(d.wPre||d.tPre||d.wPost||d.tPost||d.vSbp||d.vDbp||d.vHr||d.caMin||d.caDist||d.caKcal||d.caHr||d.caNote||d.restNote) return true;
   return (d.ex||[]).some(sets=>sets.some(s=>s.w||s.reps||s.rpe));
 }
 function saveDraft(){
@@ -720,6 +834,7 @@ function applyDraft(d){
   if(!d) return;
   const set=(id,v)=>{ const e=$(id); if(e&&v!=null&&v!=='') e.value=v; };
   set('#wPre',d.wPre); set('#tPre',d.tPre); set('#wPost',d.wPost); set('#tPost',d.tPost);
+  set('#vSbp',d.vSbp); set('#vDbp',d.vDbp); set('#vHr',d.vHr);
   set('#caType',d.caType); set('#caMin',d.caMin); set('#caDist',d.caDist);
   set('#caKcal',d.caKcal); set('#caHr',d.caHr); set('#caNote',d.caNote); set('#restNote',d.restNote);
   const cards=document.querySelectorAll('#exList .exq');
@@ -735,6 +850,7 @@ function applyDraft(d){
     });
   });
   calcDuration();
+  checkVitals({silent:true});
   showDraftNote();
 }
 function showDraftNote(){
@@ -824,15 +940,18 @@ function saveSession(){
   /* 体重・トレーニング時間 */
   const wPre=parseFloat($('#wPre').value), wPost=parseFloat($('#wPost').value);
   const tPre=$('#tPre').value||null, tPost=$('#tPost').value||null;
-  const body={ wPre: wPre>0?wPre:null, wPost: wPost>0?wPost:null, tPre, tPost, durMin: durationMin(tPre,tPost) };
-  const hasBody = body.wPre!=null||body.wPost!=null||body.tPre||body.tPost;
+  const gv=id=>{ const v=parseFloat($(id).value); return (v>0)?v:null; };
+  const body={ wPre: wPre>0?wPre:null, wPost: wPost>0?wPost:null, tPre, tPost, durMin: durationMin(tPre,tPost),
+               sbp:gv('#vSbp'), dbp:gv('#vDbp'), hr:gv('#vHr') };
+  const hasBody = body.wPre!=null||body.wPost!=null||body.tPre||body.tPost||body.sbp!=null||body.dbp!=null||body.hr!=null;
   if(!exercises.length && !ca.type && !hasBody){ toast('入力がありません'); return; }
   /* ts=登録操作の実時刻。過去日付でも記録順が保てるよう、日付＋操作時刻の両方を保持 */
   S.sessions.push({date:recDate, set:curSet, exercises, cardio: ca.type?ca:null, body, ts:Date.now()});
   /* 日付順（同日は登録時刻順）に並べ替え。バックデート記録も正しい位置に入る */
   S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
   save();
-  ['caMin','caDist','caKcal','caHr','caNote','wPre','wPost','tPre','tPost'].forEach(id=>$('#'+id).value='');
+  ['caMin','caDist','caKcal','caHr','caNote','wPre','wPost','tPre','tPost','vSbp','vDbp','vHr'].forEach(id=>$('#'+id).value='');
+  $('#vitMsg').innerHTML=''; vitLastKey='';
   clearDraft();
   const label = recDate===todayISO()? '' : '（'+recDate+'）';
   toast('保存しました '+dayName(curSet)+label);
@@ -859,6 +978,11 @@ function renderRecent(){
     if(bd.wPre!=null||bd.wPost!=null){
       const dw=(bd.wPre!=null&&bd.wPost!=null)? ` → ${(bd.wPost-bd.wPre>=0?'+':'')}${fmt(bd.wPost-bd.wPre,2)}kg`:'';
       extra+=`<br><small class="hint">⚖ ${bd.wPre!=null?fmt(bd.wPre,1):'—'} / ${bd.wPost!=null?fmt(bd.wPost,1):'—'}kg${dw}</small>`;
+    }
+    if(bd.sbp!=null||bd.hr!=null){
+      const a=vitalAssess(bd.sbp??null,bd.dbp??null,bd.hr??null);
+      const mark=a.lv>=2?' <b style="color:var(--red)">要注意</b>':(a.lv===1?' <span style="color:#8a6a10">やや高め</span>':'');
+      extra+=`<br><small class="hint">🩺 ${fmtVit(bd.sbp??null,bd.dbp??null,bd.hr??null)}${mark}</small>`;
     }
     const row=el('div','row',`<div><span class="s">${setLabel(se.set)}</span> <span class="d">${se.date}</span><br><small class="hint">${summ}${ca}</small>${extra}</div>`);
     const btn=el('button','edit','編集'); btn.onclick=()=>{ if(!se.ts){ se.ts=Date.now(); save(); } editId=se.ts; renderRecent(); };
@@ -887,7 +1011,12 @@ function buildEditBox(se){
       <input class="bwp" type="number" inputmode="decimal" value="${se.body?.wPre??''}">
       <input class="btp" type="time" value="${se.body?.tPre??''}">
       <input class="bwq" type="number" inputmode="decimal" value="${se.body?.wPost??''}">
-      <input class="btq" type="time" value="${se.body?.tPost??''}"></div>`;
+      <input class="btq" type="time" value="${se.body?.tPost??''}"></div>
+    <div class="elbl" style="grid-template-columns:1fr 1fr 1fr"><span>収縮期</span><span>拡張期</span><span>心拍</span></div>
+    <div class="erow" id="ed_vit" style="grid-template-columns:1fr 1fr 1fr">
+      <input class="vs" type="number" inputmode="decimal" value="${se.body?.sbp??''}">
+      <input class="vd" type="number" inputmode="decimal" value="${se.body?.dbp??''}">
+      <input class="vh" type="number" inputmode="decimal" value="${se.body?.hr??''}"></div>`;
   se.exercises.forEach((e,ei)=>{
     html+=`<div class="ex-name">${e.name}</div>
       <div class="elbl"><span></span><span>重量kg</span><span>回数</span><span>RPE</span><span></span></div>
@@ -953,9 +1082,12 @@ function saveEdit(ts){
   if(bb){
     const wp=parseFloat(bb.querySelector('.bwp').value), wq=parseFloat(bb.querySelector('.bwq').value);
     const tp=bb.querySelector('.btp').value||null, tq=bb.querySelector('.btq').value||null;
-    se.body={ wPre: wp>0?wp:null, wPost: wq>0?wq:null, tPre:tp, tPost:tq, durMin: durationMin(tp,tq) };
+    const vv=$('#ed_vit');
+    const pv=sel=>{ const v=vv?parseFloat(vv.querySelector(sel).value):NaN; return v>0?v:null; };
+    se.body={ wPre: wp>0?wp:null, wPost: wq>0?wq:null, tPre:tp, tPost:tq, durMin: durationMin(tp,tq),
+              sbp:pv('.vs'), dbp:pv('.vd'), hr:pv('.vh') };
   }
-  const hb=se.body&&(se.body.wPre!=null||se.body.wPost!=null||se.body.tPre||se.body.tPost);
+  const hb=se.body&&(se.body.wPre!=null||se.body.wPost!=null||se.body.tPre||se.body.tPost||se.body.sbp!=null||se.body.hr!=null);
   if(!se.exercises.length && !se.cardio && !hb){ deleteSession(ts,true); return; }
   S.sessions.sort((a,b)=>{ if(a.date!==b.date) return a.date<b.date?-1:1; return (a.ts||0)-(b.ts||0); });
   save(); editId=null; toast('変更を保存しました'); renderTrain();
@@ -1121,6 +1253,7 @@ function renderGraphs(){
   vc.appendChild(chartCard('トレーニング量(kg)', barChart(volPts,{color:'#2563eb'})));
   const caPts=S.sessions.filter(se=>se.cardio&&se.cardio.kcal).slice(-12).map(se=>({v:se.cardio.kcal,label:shortDate(se.date)}));
   vc.appendChild(chartCard('有酸素 消費kcal', barChart(caPts,{color:'#2f9e63'})));
+  renderVitCharts();
   const bc=$('#bodyCharts'); bc.innerHTML='';
   const bmap=k=>S.body.map(b=>({v:b[k], t:new Date(b.date).getTime(), label:shortDate(b.date)}));
   if(S.body.length){
@@ -1143,6 +1276,29 @@ function renderGraphs(){
   $('#hChart').innerHTML = S.health.length?
     `<div class="chartcard"><div class="ct"><span>${hf.lab}${hf.unit?'（'+hf.unit+'）':''} <span class="ref" style="color:var(--ink-faint);font-size:10px">基準 ${hf.ref}</span></span></div>${lineChart(hpts,{color:'#1e40af',xMode:'time',refLo:hf.lo??null,refHi:hf.hi??null})}</div>`
     : '<div class="empty"><div class="k">🩺</div><p>健診結果を保存すると、項目ごとの推移が見られます。緑の帯が基準値内、赤い点は基準値オーバーです。</p></div>';
+}
+function renderVitCharts(){
+  const box=$('#vitCharts'), sum=$('#vitSummary'); if(!box) return;
+  box.innerHTML=''; sum.innerHTML='';
+  const rec=S.sessions.filter(se=>se.body&&(se.body.sbp!=null||se.body.hr!=null))
+    .map(se=>({t:new Date(se.date+'T12:00:00').getTime(), label:shortDate(se.date), b:se.body, date:se.date}));
+  if(!rec.length){
+    box.appendChild(chartCard('血圧・心拍','<div class="empty" style="padding:14px"><p>記録タブの「開始前」で血圧・心拍を入力すると、ここに推移が表示されます。</p></div>'));
+    return;
+  }
+  const last=rec[rec.length-1], a=vitalAssess(last.b.sbp??null,last.b.dbp??null,last.b.hr??null);
+  const cls=['ok','w1','w2','w3'][a.lv];
+  sum.innerHTML=`<div class="vit-note ${cls}" style="margin:0 0 12px">最新（${last.date}）: ${fmtVit(last.b.sbp??null,last.b.dbp??null,last.b.hr??null)}${a.lv===0?'　— 目安の範囲内です':'　— '+a.msg}</div>`;
+  const mk=k=>rec.map(r=>({v:r.b[k]??null, t:r.t, label:r.label}));
+  box.appendChild(chartCard('収縮期血圧（上）', lineChart(mk('sbp'),{color:'#d23b22',xMode:'time',refHi:VIT_LIMITS.sbpHi})));
+  box.appendChild(chartCard('拡張期血圧（下）', lineChart(mk('dbp'),{color:'#e0842f',xMode:'time',refHi:VIT_LIMITS.dbpHi})));
+  box.appendChild(chartCard('心拍数（bpm）', lineChart(mk('hr'),{color:'#2563eb',xMode:'time',refLo:VIT_LIMITS.hrLo,refHi:VIT_LIMITS.hrHi})));
+  /* 直近5回で注意域が複数あれば案内 */
+  const recent=rec.slice(-5).filter(r=>vitalAssess(r.b.sbp??null,r.b.dbp??null,r.b.hr??null).lv>=2);
+  if(recent.length>=2){
+    const n=el('div','vit-note w2',`直近5回のうち<b>${recent.length}回</b>で注意域の数値が出ています。同じ傾向が続く場合は、一度医師にご相談ください。`);
+    n.style.marginTop='12px'; box.parentNode.appendChild(n);
+  }
 }
 function chartCard(title, svg){ return el('div','chartcard',`<div class="ct"><span>${title}</span></div>${svg}`); }
 
@@ -1288,7 +1444,8 @@ function genReport(){
     if(se.cardio) L.push(`   - 有酸素: ${se.cardio.type} ${se.cardio.min||'-'}分 ${se.cardio.dist||'-'}km ${se.cardio.kcal||'-'}kcal HR${se.cardio.hr||'-'}`);
     if(se.body){ const b=se.body;
       if(b.durMin!=null) L.push(`   - トレーニング時間: ${fmtDur(b.durMin)}（${b.tPre||'-'}〜${b.tPost||'-'}）`);
-      if(b.wPre!=null||b.wPost!=null) L.push(`   - 体重: 開始前${b.wPre!=null?fmt(b.wPre,1):'-'}kg → 終了後${b.wPost!=null?fmt(b.wPost,1):'-'}kg`); }
+      if(b.wPre!=null||b.wPost!=null) L.push(`   - 体重: 開始前${b.wPre!=null?fmt(b.wPre,1):'-'}kg → 終了後${b.wPost!=null?fmt(b.wPost,1):'-'}kg`);
+      if(b.sbp!=null||b.hr!=null) L.push(`   - 開始前の血圧・心拍: ${fmtVit(b.sbp??null,b.dbp??null,b.hr??null)}`); }
   });
   L.push('');
   if(S.body.length){ const b=S.body[S.body.length-1], f=S.body[0];
@@ -1349,9 +1506,9 @@ function exportCSV(){
   S.sessions.filter(se=>se.set==='R').forEach(se=>rows.push([se.date,se.note||'']));
   rows.push([]);
   rows.push(['■体重・トレーニング時間']);
-  rows.push(['日付','区分','開始前kg','開始時刻','終了後kg','終了時刻','トレーニング時間(分)']);
-  S.sessions.filter(se=>se.body&&(se.body.wPre!=null||se.body.wPost!=null||se.body.tPre)).forEach(se=>{const b=se.body;
-    rows.push([se.date,setLabel(se.set),b.wPre??'',b.tPre??'',b.wPost??'',b.tPost??'',b.durMin??'']);});
+  rows.push(['日付','区分','開始前kg','開始時刻','終了後kg','終了時刻','トレーニング時間(分)','収縮期','拡張期','心拍']);
+  S.sessions.filter(se=>se.body&&(se.body.wPre!=null||se.body.wPost!=null||se.body.tPre||se.body.sbp!=null||se.body.hr!=null)).forEach(se=>{const b=se.body;
+    rows.push([se.date,setLabel(se.set),b.wPre??'',b.tPre??'',b.wPost??'',b.tPost??'',b.durMin??'',b.sbp??'',b.dbp??'',b.hr??'']);});
   rows.push([]);
   rows.push(['■有酸素']);
   rows.push(['日付','種目','時間分','距離km','消費kcal','平均心拍']);
