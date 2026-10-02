@@ -126,6 +126,10 @@
   .mx-top .ordnum{flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--blue); color:#fff; font-family:var(--num); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center}
   .mx-top .mv{flex-shrink:0; border:1px solid var(--line); background:#fff; color:var(--blue-deep); font-size:14px; cursor:pointer; border-radius:7px; padding:5px 7px; line-height:1}
   .mx-top .mv:disabled{opacity:.28; cursor:default}
+  .asst-row{display:flex; align-items:center; gap:8px; margin-top:9px; font-size:11.5px; color:var(--ink-soft); cursor:pointer}
+  .asst-row input{width:18px; height:18px; flex-shrink:0; accent-color:var(--blue)}
+  .asst-row b{color:var(--blue-deep)}
+  .asst-badge{display:inline-block; font-size:9.5px; font-weight:700; color:#fff; background:#7a5bb5; border-radius:20px; padding:1px 7px; margin-left:5px; vertical-align:1px}
   .mx-nums{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px}
   .mx-f label{display:block; font-size:10px; color:var(--ink-faint); text-align:center; margin-bottom:2px; white-space:nowrap}
   .mx-f input{width:100%; padding:8px 4px; border:1px solid var(--line); border-radius:8px; font-size:16px; font-family:var(--num); text-align:center; background:#fff}
@@ -556,15 +560,40 @@ function e1RM(w,reps,rpe){
   const rir=Math.max(0,10-(rpe||10));
   return w*(1+(reps+rir)/30);
 }
-function bestSet(sets){
+/* ---- アシスト式マシン対応 ----
+   チンニング/ディッピングのアシストマシンは、設定重量＝補助の大きさ。
+   重量を減らすほど負荷が上がるため、進行方向と成長指標を反転させる。 */
+function findCfg(name){
+  for(const k of DAYKEYS){ const f=(S.menus[k]||[]).find(e=>e.name===name); if(f) return f; }
+  return null;
+}
+function latestBodyWeight(){
+  for(let i=S.body.length-1;i>=0;i--) if(S.body[i].w>0) return S.body[i].w;
+  for(let i=S.sessions.length-1;i>=0;i--){ const b=S.sessions[i].body; if(b&&b.wPre>0) return b.wPre; }
+  return null;
+}
+/* 比較・グラフ用の実効負荷。アシスト式は「体重 − アシスト」 */
+function effLoad(cfg,w){
+  if(cfg&&cfg.assist){ const bw=latestBodyWeight(); if(bw==null) return null; return Math.max(bw-w,1); }
+  return w;
+}
+function bestSet(sets, cfg){
   let best=null;
-  sets.forEach(s=>{ const v=e1RM(s.w,s.reps,s.rpe); if(v>0&&(!best||v>best.e1)) best={w:s.w,reps:s.reps,rpe:s.rpe,e1:v}; });
+  sets.forEach(s=>{
+    const L=effLoad(cfg,s.w);
+    const v=(L==null)?0:e1RM(L,s.reps,s.rpe);
+    if(v>0&&(!best||v>best.e1)) best={w:s.w,reps:s.reps,rpe:s.rpe,e1:v,load:L};
+  });
+  /* 体重未登録でアシスト式の指標が出せない場合は、回数だけで比較できるようにしておく */
+  if(!best && cfg && cfg.assist){
+    sets.forEach(s=>{ if(s.w>=0&&s.reps>0&&(!best||s.reps>best.reps)) best={w:s.w,reps:s.reps,rpe:s.rpe,e1:0,load:null}; });
+  }
   return best;
 }
 function lastEntryFor(name){
   for(let i=S.sessions.length-1;i>=0;i--){
     const ex=S.sessions[i].exercises.find(e=>e.name===name);
-    if(ex){ const b=bestSet(ex.sets); if(b) return {b, date:S.sessions[i].date}; }
+    if(ex){ const b=bestSet(ex.sets, findCfg(name)); if(b) return {b, date:S.sessions[i].date}; }
   }
   return null;
 }
@@ -579,7 +608,7 @@ function historyFor(name,n){
   for(let i=S.sessions.length-1;i>=0&&out.length<n;i--){
     const ex=S.sessions[i].exercises.find(e=>e.name===name);
     if(!ex) continue;
-    const ls=lastSetOf(ex.sets), bs=bestSet(ex.sets);
+    const ls=lastSetOf(ex.sets), bs=bestSet(ex.sets, findCfg(name));
     if(ls&&bs) out.push({date:S.sessions[i].date, last:ls, best:bs});
   }
   return out;
@@ -606,43 +635,54 @@ function deloadFlag(name){
    E. それ以外                          → 同重量で回数+1回にチャレンジ
 */
 function recommend(cfg, last, name){
-  if(!last) return {cls:'', txt:`初回はフォーム重視で <b>${cfg.min}〜${cfg.max}回 @RPE${cfg.rpe}</b> を目安に。`};
+  const asst=!!(cfg&&cfg.assist);
+  const U=asst?'アシスト':'';            /* 表示用の接頭語 */
+  if(!last) return {cls:'', txt:`初回はフォーム重視で <b>${cfg.min}〜${cfg.max}回 @RPE${cfg.rpe}</b> を目安に。`
+    +(asst?'<br><small>アシスト式: 設定を軽くするほど負荷が上がります。</small>':'')};
   const w=last.w, reps=last.reps, rpe=last.rpe==null?null:last.rpe;
   const dl = name? deloadFlag(name) : {on:false};
   const round=v=>Math.round(v*4)/4;
+  /* 負荷を上げる = 通常は重量+、アシスト式はアシスト− */
+  const harder = v=> asst? Math.max(0, round(v-cfg.inc)) : round(v+cfg.inc);
+  const easier = v=> asst? round(v+cfg.inc) : round(Math.max(v*0.93, v-cfg.inc));
   let res;
 
   if(rpe!=null && rpe>=10){
-    /* B: 限界到達 → 同じ重量・回数のまま、余力を残す方向へ */
     res={cls:'warn', nextW:w, nextReps:reps,
-      txt:`<b>同じ重量 ${fmt(w,2)}kg × ${reps}回を維持</b>。前回は限界(RPE10)まで追い込んだので、次回は<b>余力1〜2回を残す(RPE8〜9)</b>ことを目標に。`};
+      txt:`<b>同じ${U}${fmt(w,2)}kg × ${reps}回を維持</b>。前回は限界(RPE10)まで追い込んだので、次回は<b>余力1〜2回を残す(RPE8〜9)</b>ことを目標に。`};
   } else if(reps>=cfg.max && rpe!=null && rpe<=cfg.rpe){
-    /* A: 目標達成かつ余裕あり → 増量 */
-    const nw=round(w+cfg.inc);
-    res={cls:'up', nextW:nw, nextReps:cfg.min,
-      txt:`<b>重量アップ → ${fmt(nw,2)}kg × ${cfg.min}回</b>（前回 ${fmt(w,2)}kg×${reps} RPE${rpe} クリア）`};
+    const nw=harder(w);
+    if(asst && w<=0){
+      res={cls:'up', nextW:0, nextReps:cfg.min,
+        txt:`<b>アシストなし（自重）で ${cfg.max}回を達成</b>。次は加重ベルトなどで負荷を足すか、より難しい種目への移行を検討しましょう。`};
+    } else if(asst){
+      res={cls:'up', nextW:nw, nextReps:cfg.min,
+        txt:`<b>アシストを軽くする → ${fmt(nw,2)}kg × ${cfg.min}回</b>（前回 アシスト${fmt(w,2)}kg×${reps} RPE${rpe} クリア）<br><small>補助が減る＝負荷アップです。</small>`};
+    } else {
+      res={cls:'up', nextW:nw, nextReps:cfg.min,
+        txt:`<b>重量アップ → ${fmt(nw,2)}kg × ${cfg.min}回</b>（前回 ${fmt(w,2)}kg×${reps} RPE${rpe} クリア）`};
+    }
   } else if(rpe!=null && rpe>=9 && reps>=cfg.min){
-    /* C: きつめ → 回数は増やさず維持 */
     res={cls:'', nextW:w, nextReps:reps,
-      txt:`<b>同じ重量 ${fmt(w,2)}kg × ${reps}回で維持</b>。RPE${rpe}と高めなので、余裕が出て(RPE${cfg.rpe}以下)から次に進みます。`};
+      txt:`<b>同じ${U}${fmt(w,2)}kg × ${reps}回で維持</b>。RPE${rpe}と高めなので、余裕が出て(RPE${cfg.rpe}以下)から次に進みます。`};
   } else if(reps<cfg.min && rpe!=null && rpe>=9.5){
-    /* D: 回数不足かつ限界近い → 減量 */
-    const nw=round(Math.max(w*0.93, w-cfg.inc));
+    const nw=easier(w);
     res={cls:'down', nextW:nw, nextReps:cfg.min,
-      txt:`<b>重量を下げる → ${fmt(nw,2)}kg × ${cfg.min}回</b>。前回は${reps}回(RPE${rpe})で目標回数に届かなかったため、確実にこなせる重量に戻します。`};
+      txt: asst
+        ? `<b>アシストを増やす → ${fmt(nw,2)}kg × ${cfg.min}回</b>。前回は${reps}回(RPE${rpe})で目標回数に届かなかったため、補助を足して確実に回数をこなします。`
+        : `<b>重量を下げる → ${fmt(nw,2)}kg × ${cfg.min}回</b>。前回は${reps}回(RPE${rpe})で目標回数に届かなかったため、確実にこなせる重量に戻します。`};
   } else if(reps<cfg.min){
     res={cls:'', nextW:w, nextReps:cfg.min,
-      txt:`<b>同じ重量 ${fmt(w,2)}kg で ${cfg.min}回</b>を目標に（前回 ${reps}回${rpe?' RPE'+rpe:''}）。`};
+      txt:`<b>同じ${U}${fmt(w,2)}kg で ${cfg.min}回</b>を目標に（前回 ${reps}回${rpe?' RPE'+rpe:''}）。`};
   } else {
-    /* E: 余裕あり → 回数を伸ばす */
     const tgt=Math.min(cfg.max, reps+1);
     res={cls:'', nextW:w, nextReps:tgt,
-      txt:`<b>同じ重量 ${fmt(w,2)}kg で ${tgt}回にチャレンジ</b>（前回 ${reps}回${rpe?' RPE'+rpe:''}）`};
+      txt:`<b>同じ${U}${fmt(w,2)}kg で ${tgt}回にチャレンジ</b>（前回 ${reps}回${rpe?' RPE'+rpe:''}）`};
   }
   if(dl.on){
-    res.cls='down';
-    res.deload=true;
-    res.txt=`⚠ <b>疲労蓄積のサイン</b>（${dl.reason}）。次回は<b>重量を10%下げる</b>か、<b>1回休養を挟む</b>ことを検討してください。<br><span style="opacity:.85">通常の目安: ${res.txt}</span>`;
+    res.cls='down'; res.deload=true;
+    const how = asst? 'アシストを10%増やす' : '重量を10%下げる';
+    res.txt=`⚠ <b>疲労蓄積のサイン</b>（${dl.reason}）。次回は<b>${how}</b>か、<b>1回休養を挟む</b>ことを検討してください。<br><span style="opacity:.85">通常の目安: ${res.txt}</span>`;
   }
   return res;
 }
@@ -887,10 +927,14 @@ function renderExList(){
     const lastSet=hist.length?hist[0].last:null;   /* 最終セットを判定の主軸に */
     const rec=recommend(cfg, lastSet, cfg.name);
     const card=el('div','exq');
-    const e1txt = last? 'e1RM '+fmt(last.b.e1,0)+'kg' : '記録なし';
-    card.appendChild(el('div','head',`<span class="nm">${cfg.name}</span><span class="e1">${e1txt}<br><span style="color:var(--ink-faint)">目標 ${cfg.min}–${cfg.max}回 @RPE${cfg.rpe}</span></span>`));
+    let e1txt;
+    if(!last) e1txt='記録なし';
+    else if(cfg.assist) e1txt = last.b.e1>0? '実質 '+fmt(last.b.e1,0)+'kg' : 'アシスト'+fmt(last.b.w,0)+'kg';
+    else e1txt = 'e1RM '+fmt(last.b.e1,0)+'kg';
+    const badge = cfg.assist? '<span class="asst-badge">アシスト式</span>' : '';
+    card.appendChild(el('div','head',`<span class="nm">${cfg.name}${badge}</span><span class="e1">${e1txt}<br><span style="color:var(--ink-faint)">目標 ${cfg.min}–${cfg.max}回 @RPE${cfg.rpe}</span></span>`));
     card.appendChild(el('div','rec '+rec.cls,'次回の目安： '+rec.txt));
-    card.appendChild(el('div','setlbl','<span></span><span>重量kg</span><span>回数</span><span>RPE</span>'));
+    card.appendChild(el('div','setlbl',`<span></span><span>${cfg.assist?'アシストkg':'重量kg'}</span><span>回数</span><span>RPE</span>`));
     const rows=el('div',''); rows.dataset.mi=mi;
     const preW = rec.nextW!=null?fmt(rec.nextW,2):(last?fmt(last.b.w,2):'');
     const preR = rec.nextReps!=null?rec.nextReps:'';
@@ -970,7 +1014,7 @@ function renderRecent(){
       row.appendChild(b); box.appendChild(row); return;
     }
     const vol=se.exercises.reduce((a,e)=>a+e.sets.reduce((x,s)=>x+s.w*s.reps,0),0);
-    const summ=se.exercises.map(e=>{const b=bestSet(e.sets); return e.name.slice(0,5)+' '+(b?fmt(b.w,0)+'×'+b.reps:'');}).join(' / ');
+    const summ=se.exercises.map(e=>{const b=bestSet(e.sets, findCfg(e.name)); return e.name.slice(0,5)+' '+(b?fmt(b.w,0)+'×'+b.reps:'');}).join(' / ');
     const ca=se.cardio?` ・ 有酸素 ${se.cardio.type}${se.cardio.min?' '+se.cardio.min+'分':''}`:'';
     const bd=se.body||{};
     let extra='';
@@ -1245,8 +1289,14 @@ function renderGraphs(){
   const ec=$('#exChart');
   if(!curExChart){ ec.innerHTML='<div class="empty"><div class="k">📈</div><p>トレーニングを記録すると、種目ごとの推定1RMがグラフになります。</p></div>'; }
   else{
-    const pts=[]; S.sessions.forEach(se=>{ const ex=se.exercises.find(e=>e.name===curExChart); if(ex){ const b=bestSet(ex.sets); if(b) pts.push({v:b.e1, label:shortDate(se.date)}); } });
-    ec.innerHTML=`<div class="chartcard"><div class="ct"><span>${curExChart} 推定1RM</span><b>${pts.length?fmt(pts[pts.length-1].v,0)+'kg':'—'}</b></div>${lineChart(pts)}</div>`;
+    const ecfg=findCfg(curExChart);
+    const pts=[]; S.sessions.forEach(se=>{ const ex=se.exercises.find(e=>e.name===curExChart); if(ex){ const b=bestSet(ex.sets, ecfg); if(b&&b.e1>0) pts.push({v:b.e1, label:shortDate(se.date)}); } });
+    const ttl = (ecfg&&ecfg.assist)? `${curExChart} 実質負荷の推定1RM<br><small style="font-size:9.5px">体重−アシストで算出</small>` : `${curExChart} 推定1RM`;
+    if(ecfg&&ecfg.assist&&!pts.length){
+      ec.innerHTML='<div class="empty"><div class="k">⚖️</div><p>アシスト式の指標を出すには体重の登録が必要です。<br>体組成タブか記録タブの「開始前の体重」を入力してください。</p></div>';
+    } else {
+      ec.innerHTML=`<div class="chartcard"><div class="ct"><span>${ttl}</span><b>${pts.length?fmt(pts[pts.length-1].v,0)+'kg':'—'}</b></div>${lineChart(pts)}</div>`;
+    }
   }
   const vc=$('#volCharts'); vc.innerHTML='';
   const volPts=S.sessions.filter(se=>se.set!=='R').slice(-12).map(se=>({v:se.exercises.reduce((a,e)=>a+e.sets.reduce((x,s)=>x+s.w*s.reps,0),0), label:shortDate(se.date)}));
@@ -1322,7 +1372,8 @@ function renderHome(){
   const mains=[...new Set(DAYKEYS.flatMap(k=>(S.menus[k]||[])).map(e=>e.name))];
   let any=false;
   mains.forEach(nm=>{
-    const seq=[]; S.sessions.forEach(se=>{const ex=se.exercises.find(e=>e.name===nm); if(ex){const b=bestSet(ex.sets); if(b)seq.push(b.e1);} });
+    const mcfg=findCfg(nm);
+    const seq=[]; S.sessions.forEach(se=>{const ex=se.exercises.find(e=>e.name===nm); if(ex){const b=bestSet(ex.sets, mcfg); if(b&&b.e1>0)seq.push(b.e1);} });
     if(seq.length){ any=true; const first=seq[0], now=seq[seq.length-1]; const pct=first>0?((now-first)/first*100):0;
       const w=Math.max(6,Math.min(100, first>0? (now/first)*50 : 50));
       const sign=pct>=0?'+':'';
@@ -1369,14 +1420,19 @@ function renderMenuEditor(k){
         <div class="mx-f"><label>回数下限</label><input type="number" inputmode="decimal" value="${ex.min}" data-f="min"></div>
         <div class="mx-f"><label>回数上限</label><input type="number" inputmode="decimal" value="${ex.max}" data-f="max"></div>
         <div class="mx-f"><label>目標RPE</label><input type="number" inputmode="decimal" value="${ex.rpe}" data-f="rpe" step="0.5"></div>
-        <div class="mx-f"><label>増量kg</label><input type="number" inputmode="decimal" value="${ex.inc}" data-f="inc" step="0.5"></div>
-      </div>`;
+        <div class="mx-f"><label>調整幅kg</label><input type="number" inputmode="decimal" value="${ex.inc}" data-f="inc" step="0.5"></div>
+      </div>
+      <label class="asst-row"><input type="checkbox" data-f="assist"${ex.assist?' checked':''}>
+        <span>アシスト式マシン（重量を<b>減らす</b>ほど負荷が上がる）</span></label>`;
     /* 入力と同時に即保存（再描画で消えないように） */
     row.querySelectorAll('input').forEach(inp=>{
-      inp.addEventListener('input',()=>{
+      const ev = inp.type==='checkbox'?'change':'input';
+      inp.addEventListener(ev,()=>{
         const f=inp.dataset.f;
-        S.menus[k][i][f] = (f==='name')? inp.value : (parseFloat(inp.value)||S.menus[k][i][f]);
+        if(f==='assist') S.menus[k][i].assist = inp.checked;
+        else S.menus[k][i][f] = (f==='name')? inp.value : (parseFloat(inp.value)||S.menus[k][i][f]);
         save();
+        if(f==='assist') renderMenuEditor(k);
       });
     });
     row.querySelector('.up').onclick=()=>moveExercise(k,i,-1);
@@ -1391,11 +1447,11 @@ const PPL_PRESET={
   P:[
     {name:'チェストプレス',        min:8,max:10,rpe:9,inc:2.5},
     {name:'ショルダープレス',      min:5,max:8, rpe:9,inc:2.5},
-    {name:'ディッピング',          min:8,max:10,rpe:9,inc:2.5},
+    {name:'ディッピング',          min:8,max:10,rpe:9,inc:5, assist:true},
     {name:'フライ',                min:8,max:10,rpe:9,inc:2.5}
   ],
   U:[
-    {name:'チンニング',            min:8,max:10,rpe:9,inc:2.5},
+    {name:'チンニング',            min:8,max:10,rpe:9,inc:5, assist:true},
     {name:'スミスマシン・ベントオーバーローイング', min:8,max:10,rpe:9,inc:5},
     {name:'ラットプルダウン',      min:8,max:10,rpe:9,inc:5},
     {name:'バックエクステンション',min:8,max:10,rpe:9,inc:2.5}
@@ -1424,7 +1480,7 @@ function addExercise(k){ S.menus[k].push({name:'', min:8,max:12,rpe:8,inc:2.5});
 function saveMenus(){
   DAYKEYS.forEach(k=>{
     S.menus[k]=(S.menus[k]||[]).filter(e=>e.name&&e.name.trim())
-      .map(e=>({name:e.name.trim(), min:+e.min||1, max:+e.max||1, rpe:+e.rpe||8, inc:+e.inc||2.5}));
+      .map(e=>({name:e.name.trim(), min:+e.min||1, max:+e.max||1, rpe:+e.rpe||8, inc:+e.inc||2.5, assist:!!e.assist}));
   });
   save(); DAYKEYS.forEach(k=>renderMenuEditor(k));
   toast('メニューを保存しました（記録タブに反映されます）');
@@ -1439,7 +1495,7 @@ function genReport(){
   S.sessions.slice(-6).reverse().forEach(se=>{
     if(se.set==='R'){ L.push(`・${se.date} [休養日]${se.note?' '+se.note:''}`); return; }
     L.push(`・${se.date} [${dayFull(se.set)}]`);
-    se.exercises.forEach(e=>{ const b=bestSet(e.sets); const sets=e.sets.map(s=>`${fmt(s.w,1)}kg×${s.reps}@RPE${s.rpe||'-'}`).join(', ');
+    se.exercises.forEach(e=>{ const ec=findCfg(e.name); const b=bestSet(e.sets, ec); const sets=e.sets.map(s=>`${ec&&ec.assist?'アシスト':''}${fmt(s.w,1)}kg×${s.reps}@RPE${s.rpe||'-'}`).join(', ');
       L.push(`   - ${e.name}: ${sets}  (e1RM ${fmt(b?b.e1:0,0)}kg)`); });
     if(se.cardio) L.push(`   - 有酸素: ${se.cardio.type} ${se.cardio.min||'-'}分 ${se.cardio.dist||'-'}km ${se.cardio.kcal||'-'}kcal HR${se.cardio.hr||'-'}`);
     if(se.body){ const b=se.body;
